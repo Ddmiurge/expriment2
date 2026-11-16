@@ -1,0 +1,38 @@
+# 路径模板 —— 复制成 env/paths.yaml 后按机器修改。
+# paths.yaml 不进 git（每台机器不同）。
+#
+# Mac 上只有 results/ 和 third_party/ 有意义；
+# 模型、数据、runtime 三项只有服务器需要填。
+
+models:
+  qwen3vl_8b:       /path/to/models/Qwen3-VL-8B-Instruct
+  judge_qwen3_8b:   /path/to/models/Qwen3-8B
+
+data:
+  # MIDAS 只放我们自己的指令集（仓库存里没有 dateset/*.json）
+  midas_instructions: /path/to/data/midas_instructions.jsonl
+  # MIR-SafetyBench 解压后的根目录（含 Hate_Speech/ 等六个类目）
+  mir_safetybench:    /path/to/data/MIR-SafetyBench
+  # 可选：单图线已有的 MM-SafetyBench，用来生成 MIDAS 的指令
+  mm_safetybench:     /path/to/data/MM-SafetyBench
+
+# 由 env/fetch_third_party.sh 拉取，相对仓库根
+third_party: ./third_party
+
+# 结果落盘，相对仓库根
+results: ./results
+
+runtime:
+  # AVTP 的 patch 需要 eager 吗？不需要——它不用注意力权重。
+  # 但 SIEVE-alloc 要抓最后一层注意力，所以统一用 eager，避免两个剪枝器跑在不同实现上。
+  attn_implementation: eager
+  device: cuda:0
+  dtype: bfloat16
+  max_new_tokens: 768
+
+judge:
+  model: judge_qwen3_8b
+  decode: greedy
+  seed: 42
+  # 判官会话在 run_stage1.py 里只建一次；同一批样本的所有条件共用
+  session: stage1_2026-11

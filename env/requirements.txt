@@ -1,0 +1,20 @@
+# 多图剪枝安全实验 · 版本锁定
+#
+# 关键约束（不要随手升级）：
+#   transformers==4.57.1 —— AVTP 官方 Qwen3-VL patch 的实测版本。
+#   升到 5.x 后 modeling_qwen3_vl.py 的结构变了，补丁锚点会失效。
+#
+# torch 不进这里：venv 用 --system-site-packages 复用服务器已装好的 CUDA torch。
+# 装之前先确认 `python -c "import torch; print(torch.__version__, torch.cuda.is_available())"` 是 True。
+#
+# tokenizers / huggingface_hub / safetensors 不写死：让 transformers 自己拉兼容版本，
+# 手写版本号很容易和 4.57.1 的约束打架。
+
+transformers==4.57.1
+accelerate>=1.0
+
+numpy>=1.26
+pillow>=10.0
+pyyaml>=6.0
+tqdm>=4.66
+datasets>=3.0

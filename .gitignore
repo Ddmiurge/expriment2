@@ -1,0 +1,43 @@
+# ── 每台机器不同，不进 git ──────────────────────────────────
+env/paths.yaml
+env/paths.local.yaml
+*.local.yaml
+
+# ── 模型 / 数据 / 权重：只在服务器上存在 ─────────────────────
+#    开头的 / 是必需的，否则会误伤 src/data/ 和 src/models/
+/data/
+/weights/
+*.safetensors
+*.bin
+*.gguf
+*.pt
+*.pth
+
+# ── 第三方仓库：按 third_party.lock 检出 ─────────────────────
+third_party/*
+!third_party/.gitkeep
+# third_party.lock 必须进 git：它是复现依据
+
+# ── 运行产物 ────────────────────────────────────────────────
+build/
+runs/
+results/*
+!results/inbox
+!results/archive
+!results/*.md
+!results/*.tsv
+!results/.gitkeep
+results/inbox/*
+!results/inbox/.gitkeep
+results/archive/*
+!results/archive/.gitkeep
+
+# ── Python ─────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.ipynb_checkpoints/
+*.log
+.DS_Store
