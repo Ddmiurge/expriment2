@@ -5,6 +5,10 @@
 `ccfa-workfiles/ideas/pruning-survivable-attack/多图方向_选题与实验计划_2026-11-16.md`。
 
 它与单图复现仓库 `../code/` 是**两个独立仓库、两个独立 venv**，原因见文末「为什么不用一个仓库」。
+
+> 目录名说明：Mac 上本地目录叫 `multi-image-code/`，远端仓库叫 `expriment2`
+> （`git@github.com:Ddmiurge/expriment2.git`）。服务器 clone 后目录名是 `expriment2/`，
+> 下面命令里的 `cd multi-image-code` 在服务器上换成 `cd expriment2`。
 两仓库只共享三样东西：结果块的格式约定、服务器侧的操作纪律、出网边界检查脚本。
 
 ---
@@ -209,14 +213,13 @@ multi-image-code/
 ## 八、当前状态
 
 - **2026-11-16**：仓库建立，代码骨架、协议、阶段 0 检查落地。**尚未在服务器上跑过任何 GPU 检查**。
-- 本地 git 已 `init`，但**还没有 commit**。下一步：
-  1. 在 GitHub 建私有仓库，把地址加到 `origin`；
-  2. 提交并推送；
-  3. 服务器 clone，跑 `run_stage0.sh`。
+- 远端：`git@github.com:Ddmiurge/expriment2.git`，分支 `main`，首次提交 `5906334`。
+- 下一步（服务器上）：
+  1. `git clone git@github.com:Ddmiurge/expriment2.git`
+  2. `cd expriment2 && bash env/setup_venv.sh && source .venv/bin/activate`
+  3. `cp env/paths.example.yaml env/paths.yaml` 并填模型/数据路径
+  4. `bash scripts/check_egress.sh && bash env/fetch_third_party.sh`
+  5. `python scripts/apply_avtp_patch.py --mode instrumented`
+  6. `bash scripts/run_stage0.sh`
 
-```bash
-git add -A
-git commit -m "多图剪枝安全实验：骨架、协议、阶段 0 检查"
-git remote add origin <你的私有仓库地址>
-git push -u origin main
-```
+服务器只读（能 pull、不能 push）；代码改动一律在 Mac 上做、push、服务器再 pull。
