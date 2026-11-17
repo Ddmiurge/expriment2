@@ -1,6 +1,7 @@
 import unittest
 
 from src.pruning.avtp_patch import (
+    PREAMBLE,
     PatchError,
     patch_instrumented,
     patch_original,
@@ -30,6 +31,15 @@ class TestPatchState(unittest.TestCase):
             patch_original(INSTRUMENTED)
         with self.assertRaises(PatchError):
             patch_instrumented(BOTH)
+
+    def test_bf16_parity_path(self):
+        # SM0.3 实测 217 vs 213 的根因：把 bf16 转成 Python float 再算预算。
+        # 这里锁住实现，防止以后又加回 .item()。
+        self.assertIn("fig_imp = [c[0] for c in full_cos]", PREAMBLE)
+        self.assertNotIn("fig_imp = [c[0].item()", PREAMBLE)
+        self.assertIn('alpha = _PRUNE_CONFIG["alpha"]', PREAMBLE)
+        self.assertNotIn('alpha = float(_PRUNE_CONFIG["alpha"])', PREAMBLE)
+        self.assertIn("keep_ratio = ratios[idx]", PREAMBLE)
 
 
 if __name__ == "__main__":

@@ -108,6 +108,15 @@ def records() -> list[dict]:
     return list(m._PRUNE_RECORD)
 
 
+def original_records() -> list[dict]:
+    """作者原版（--mode original）的记录。只含 layer 与每图保留数，不含打分。"""
+    try:
+        from transformers.models.qwen3_vl import modeling_qwen3_vl as m
+    except ImportError:
+        return []
+    return list(getattr(m, "_ORIGINAL_RECORD", []))
+
+
 def last_kept_local() -> list[list[int]] | None:
     recs = records()
     if not recs:

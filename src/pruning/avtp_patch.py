@@ -48,12 +48,14 @@ ORIGINAL_BLOCK = '''
                 new_img_start_pos, new_img_end_pos = [], []
                 offset = 0
                 img_token_count = 0
+                _orig_counts = []
                 for index, (img_start, img_end) in enumerate(zip(img_start_pos, img_end_pos)):
                     alpha = 1.0
                     keep_ratio = base_ratio + alpha * ratio_i[index]
                     keep_ratio = keep_ratio if keep_ratio < 1.0 else 1.0
                     keep_ratio = keep_ratio if keep_ratio > 0.0 else 0.0
                     k = max(1, int((img_end-img_start-1) * keep_ratio))
+                    _orig_counts.append(k)
                     cos_sim_candidate = img_cos_sim_list[index][1:]
                     topk_indices = torch.topk(cos_sim_candidate, k=k, largest=False).indices
                     keep_mask[img_start+1:img_end][topk_indices] = True
@@ -68,6 +70,10 @@ ORIGINAL_BLOCK = '''
                     new_img_end_pos.append(new_end)
                     offset += removed_tokens
 
+                _ORIGINAL_RECORD.append({
+                    "layer": layer_idx,
+                    "per_image_keep_count": list(_orig_counts),
+                })
                 img_start_pos, img_end_pos = new_img_start_pos, new_img_end_pos
 
                 all_indices = torch.arange(seq_len, device=device)
@@ -87,6 +93,11 @@ ORIGINAL_BLOCK = '''
             # modify end
 '''
 
+
+ORIGINAL_PREAMBLE = '''
+# 作者原版的记录器：只存每层每图的保留数，不改任何计算。
+_ORIGINAL_RECORD = []
+'''
 
 PREAMBLE = '''
 # ─────────────────────────────────────────────────────────────────────────────
@@ -182,10 +193,14 @@ def _prune_step(layer_idx, hidden_states, position_ids, text_position_ids,
         token_scores = [c[1:] for c in full_cos]
         if method == "avtp":
             # 与作者代码一致：图级重要性取 vision_start 那一格的相似度
-            fig_imp = [c[0].item() for c in full_cos]
+            # 必须与作者原版逐位一致：rank_list 保留 bf16 张量，avg/ratio 也在
+            # bf16 上算。一旦 .item() 转成 Python float（float64），舍入差会在
+            # 120 个 token 上放大成半个 token，int() 截断翻转 → 长度差几个
+            # （SM0.3 实测 217 vs 213）。
+            fig_imp = [c[0] for c in full_cos]
             avg = sum(fig_imp) / len(fig_imp)
-            alpha = float(_PRUNE_CONFIG["alpha"])
-            base = float(_PRUNE_CONFIG["base_ratios"][layer_pos])
+            alpha = _PRUNE_CONFIG["alpha"]
+            base = _PRUNE_CONFIG["base_ratios"][layer_pos]
             ratios = [base + alpha * (avg - x) for x in fig_imp]
             k_same = None
         else:
@@ -199,9 +214,14 @@ def _prune_step(layer_idx, hidden_states, position_ids, text_position_ids,
 
         for idx, (s, e) in enumerate(zip(starts, ends)):
             n = e - s - 1
-            k = k_same if method == "equal" else max(
-                1, int(n * min(1.0, max(0.0, ratios[idx])))
-            )
+            if method == "equal":
+                k = k_same
+            else:
+                # 与作者一致：先夹到 (0, 1]，再 int() 截断
+                keep_ratio = ratios[idx]
+                keep_ratio = keep_ratio if keep_ratio < 1.0 else 1.0
+                keep_ratio = keep_ratio if keep_ratio > 0.0 else 0.0
+                k = max(1, int(n * keep_ratio))
             k = min(k, n)
             order = torch.topk(token_scores[idx], k=k, largest=False).indices
             keep_mask[s + 1:e][order] = True
@@ -388,6 +408,9 @@ def patch_original(text: str) -> str:
             f"文件已经是 {state} 状态；直接叠加会产生重复的 img_start_pos。"
             "先 --revert，再选一个模式重打。"
         )
+    text = _replace_once(
+        text, ANCHOR_IMPORT_END, ANCHOR_IMPORT_END + ORIGINAL_PREAMBLE, "作者版：记录器"
+    )
     text = _replace_once(
         text,
         ANCHOR_EMBED,

@@ -44,7 +44,14 @@
 **通过**：
 - 剪枝后序列长度相同；
 - 最后一个位置的 top-5 token 完全相同；
-- logits 和的相对差 <1e-3。
+- logits 和的相对差 <1e-3；
+- **每层每图的保留数逐项相等**（只比总长度会掩盖「数量相同但换了图」的错）。
+
+**2026-11-17 服务器实测**：首跑报 `217 vs 213`。根因是 instrumented 版把图级重要性
+转成 Python float（float64）再算预算，而作者原版全程 bf16 张量运算；bf16 只有 8 位尾数，
+逐层舍入让 `int()` 截断翻转。改为保留张量、按作者的 `if` 夹取后，`n_after=217`、
+logits 相对差 `0.00e+00`、top-5 与每图保留数逐项一致。对应补丁归档在
+`results/archive/2026-11-17_server_patches/`。
 
 **为什么只跑前向、不跑 generate**：decode 阶段 `input_ids` 只有一个新 token，没有视觉段；作者原版没有跳过逻辑，generate 会在 decode 步崩溃。这个崩溃与接线正确性无关，所以检查只做 prefill。
 
@@ -52,6 +59,8 @@
 - 长度不同 → 预算表或层号没对齐；检查 `_PRUNE_CONFIG` 与作者硬编码值。
 - top-5 不同但长度相同 → 打分/排序方向不一致；对照注入代码里的 `largest=False` 与 `scoring[1:]`。
 - logits 差在 1e-3 量级 → 可能是 GPU 非确定性；先重跑一次，仍差就按 bug 处理。
+- **长度差几个 token、top-5 一致** → 优先查 dtype：注入代码里不能把 bf16 张量转成
+  Python float 再算预算。对应回归测试在 `tests/test_avtp_patch.py`。
 - **SM0.3 中途崩溃**：文件会停在 `original` 状态。先 `--revert`，再
   `--mode instrumented`；**不要**直接重打，会叠成两份 `img_start_pos`。
   `--check` 现在会明确报 `original` / `instrumented` / `both`。

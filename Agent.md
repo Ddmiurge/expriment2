@@ -43,6 +43,10 @@ python scripts/apply_avtp_patch.py --revert
 
 不要手改 site-packages，不要用 `cat` 直接覆盖。脚本会留备份、做语法检查。
 
+**dtype 纪律**：注入代码里算预算时，不要把 bf16 张量转成 Python float。
+作者原版全程 bf16；转 float64 会让 `int()` 截断翻转，三层累积差几个 token
+（服务器实测 217 vs 213）。`tests/test_avtp_patch.py` 锁住了这条。
+
 **两种补丁不能叠加**。`--check` 会报 `original` / `instrumented` / `both` / `未打补丁`。
 如果 SM0.3 中途崩溃，文件会停在 `original` 状态；此时直接 `--mode instrumented`
 会叠成两份 `img_start_pos`，报 `SyntaxError: keyword argument repeated`。

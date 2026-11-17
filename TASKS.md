@@ -1,88 +1,140 @@
-# TASKS · 本轮：阶段 0 依赖核查（2026-11-16 发车）
+# TASKS · 下一轮：建攻击集 + 阶段 1 基线（阶段 0 已通过 2026-11-17）
 
-> 服务器侧只做这一轮。**阶段 0 全过之前不要跑阶段 1。**
-> 本轮不产出研究数字；产出的是「环境能不能跑、接线对不对、攻击输入合不合法」。
+> 阶段 0 六项已在服务器全过。本轮开始产出第一批研究数字，但**只到关卡 1 为止**：
+> 先跑 `none` 基线，确认攻击本身有下降空间，再跑 `avtp` / `sieve` 的 50% 档。
+> 不要在关卡 1 出结果前把 9 个条件全跑完。
 
 ---
 
-## 0 · 先做三件事
+## 0 · 拉代码 + 重打 AVTP 补丁（必须做）
+
+本轮合入了 bf16 精度对齐补丁（`src/pruning/avtp_patch.py`）。服务器上已安装的
+transformers 文件里还是旧代码，**拉完代码必须重打**：
 
 ```bash
-cd multi-image-code
-source .venv/bin/activate          # 没建过就先 bash env/setup_venv.sh
-cp env/paths.example.yaml env/paths.yaml
-# 编辑 env/paths.yaml：qwen3vl_8b / judge_qwen3_8b / 数据路径
+cd expriment2
+git pull
+source .venv/bin/activate
 
-bash scripts/check_egress.sh
-bash env/fetch_third_party.sh
+python scripts/apply_avtp_patch.py --revert
+python scripts/apply_avtp_patch.py --mode instrumented
+python scripts/apply_avtp_patch.py --check      # 应显示：已打 instrumented
 ```
 
-`fetch_third_party.sh` 按 `third_party.lock` 检出三个仓库。若 lock 里的 SHA 拉不到，
-**先报告，不要自己 --relock**——那会改变复现依据。
+如果 `--check` 显示 `original`，说明上次 SM0.3 停在原版；先 `--revert` 再重打。
+**不要**直接 `--mode instrumented`，会叠成两份 `img_start_pos`。
 
----
-
-## 1 · 跑阶段 0
+重打后建议快速重跑一次 SM0.3：
 
 ```bash
-bash scripts/run_stage0.sh
+python scripts/apply_avtp_patch.py --revert
+python scripts/apply_avtp_patch.py --mode original
+python scripts/sm0_3_avtp_equivalence.py --mode original --out /tmp/orig.json
+
+python scripts/apply_avtp_patch.py --revert
+python scripts/apply_avtp_patch.py --mode instrumented
+python scripts/sm0_3_avtp_equivalence.py --mode instrumented --out /tmp/inst.json
+python scripts/sm0_3_avtp_equivalence.py --compare /tmp/orig.json /tmp/inst.json
 ```
 
-六项检查，全过才继续。逐项判据见 `protocols/stage0_dependency_check.md`。
-
-预期时间：模型加载三次（SM0.2 一次、SM0.3 原版与可配置版各一次），约 10–20 分钟；其余是 CPU/IO。
+**通过判据新增一条**：每层每图的保留数逐项相等，不只总长度相等。
 
 ---
 
-## 2 · 回传什么
+## 1 · 准备指令集（二选一）
 
-把下面四样贴给用户（或按用户指定的方式）：
+- **MM-SafetyBench**（单图线已有，服务器上直接可用）：
+  `--input <MM-SafetyBench 的 json 路径>`
+- **MIR-SafetyBench**：
+  ```bash
+  export HUGGINGFACE_TOKEN=...
+  python third_party/mir-safetybench/extract_data.py --output /path/to/MIR-SafetyBench
+  ```
+  然后 `--input /path/to/MIR-SafetyBench`
 
-1. **`run_stage0.sh` 的完整输出**（含六项汇总表）。
-2. `nvidia-smi` 的每卡可用显存（不是标称）。
-3. SM0.2 的 `image_grid_thw` 与每图 token 数。
-4. SM0.3 的 `n_after`、top5、logits 相对差。
-
-**不要**贴模型权重路径以外的个人目录；不要贴 API key（本仓库不需要 API key）。
-
----
-
-## 3 · 失败时怎么处理
-
-| 失败项 | 先做什么 | 不要做什么 |
-|---|---|---|
-| SM0.1 版本不对 | `which python` 确认在 `.venv`；重跑 `env/setup_venv.sh` | 不要 `pip install -U transformers` |
-| SM0.2 图片数/字母不对 | 先换更清楚的合成图；再检查 processor 版本 | 不要改 `src/models/qwen3vl.py` 的 chat template 去硬凑 |
-| SM0.3 不等价 | 对照注入代码的层号/预算/排序方向 | 不要调 `sm0_3` 的容差让它过 |
-| SM0.4 掩码越界 | 记录是哪张图、哪个游戏、占比多少 | 不要放宽 `validate_sample` 的阈值 |
-| SM0.5 判官 raw 以 `<think>` 开头 | 确认 `src/eval/judge.py` 已传 `enable_thinking=False` | 不要靠加大 `max_new_tokens` 把思考前缀挤掉 |
-| SM0.5 判官方向错 | 人工看 20 条 raw，再报告 | 不要改 rubric 让 smoke 过 |
-| `apply_avtp_patch --check` 报 original | 先 `--revert`，再 `--mode instrumented` | 不要直接重打（会叠成两份 `img_start_pos`） |
-| 任何需要改 `src/` 的 | 把补丁打印出来，交回 Mac | 不要在服务器上直接改 |
+先跑 40 条试点。指令集要**固定下来**，后面所有条件都用同一批 id。
 
 ---
 
-## 4 · 通过之后（下一轮，先不要做）
+## 2 · 生成攻击集
 
-1. 准备指令来源（二选一）：
-   - **MM-SafetyBench**（单图线已有，服务器上直接可用）：`--input <MM-SafetyBench 的 json>`
-   - **MIR-SafetyBench**：先 `export HUGGINGFACE_TOKEN=...`，再
-     `python third_party/mir-safetybench/extract_data.py --output /path/to/MIR-SafetyBench`
-2. 生成正式攻击集：
-   ```bash
-   python scripts/build_attack_set.py \
-       --input <MIR-SafetyBench 或 MM-SafetyBench 路径> \
-       --out data/midas/attack_set.jsonl --limit 40 --keyword-mode llm
-   ```
-   关键词模式默认 `llm`（本地 Qwen3-8B，按 MIDAS 原文 prompt）；`rule` 只用于快速冒烟。
-3. 跑阶段 1 基线：`python scripts/run_stage1.py --pruner none --limit 40 --out runs/base`。
-4. 按 `protocols/stage1_measure_attribution_prereg.md` 跑其余条件。
+```bash
+python scripts/build_attack_set.py \
+    --input <MM-SafetyBench 或 MIR-SafetyBench 路径> \
+    --out data/midas/attack_set.jsonl \
+    --limit 40 --keyword-mode llm
+```
+
+- `--keyword-mode llm` 用本地 Qwen3-8B 按 MIDAS 原文 prompt 抽词；`rule` 只用于快速冒烟。
+- 生成后会打印每张图的掩码占比。占比在 `[0.0002, 0.25]` 之外会标 ✗，按协议处理。
+- 这一步只用 CPU + 一次 Qwen3-8B 加载，不占受害者模型。
+
+生成完先空跑校验：
+
+```bash
+python scripts/run_stage1.py --attack midas \
+    --samples data/midas/attack_set.jsonl --pruner none \
+    --out runs/stage1_base --limit 40 --dry-run
+```
 
 ---
 
-## 5 · 本轮禁止
+## 3 · 跑基线（关卡 1 的前半）
 
-- 不要跑阶段 1（结果块会污染正式表）。
+```bash
+python scripts/run_stage1.py --attack midas \
+    --samples data/midas/attack_set.jsonl --pruner none \
+    --out runs/stage1_base --limit 40
+```
+
+跑完看两样：
+
+1. 结果块里的 ASR；
+2. 控制台是否打出「基线 ASR <20%」或「>95%」的警告。
+
+**基线健全性闸**（协议 §5.1）：
+- 20–90% → 正常，继续；
+- <20% → 攻击太弱，先换 DMN/MIR，不要直接判「不杀」；
+- >95% → 天花板，解释要收窄。
+
+---
+
+## 4 · 跑主条件（关卡 1 的后半）
+
+```bash
+python scripts/run_stage1.py --attack midas \
+    --samples data/midas/attack_set.jsonl --pruner avtp --budget 0.5 \
+    --out runs/stage1_avtp50 --limit 40 --compare runs/stage1_base/results.jsonl
+
+python scripts/run_stage1.py --attack midas \
+    --samples data/midas/attack_set.jsonl --pruner sieve --budget 0.5 \
+    --out runs/stage1_sieve50 --limit 40 --compare runs/stage1_base/results.jsonl
+```
+
+跑完把三个结果块（`runs/*/result.block.txt`）粘回 Mac。**先看关卡 1 判定**：
+跌幅 >10pp 且区间上界 <0 → 杀成立；<5pp 或跨 0 → 不杀；5–10 → 灰区扩容。
+
+**不要**在这一步之前跑 25% 档和拆机制对照。
+
+---
+
+## 5 · 已知的坑（阶段 0 踩过的）
+
+| 坑 | 处理 |
+|---|---|
+| 判官 raw 以 `<think>` 开头 | `judge.py` 已传 `enable_thinking=False`；确认拉到了最新代码 |
+| `--check` 报 `original` / `both` | 先 `--revert`，再选模式重打；不要叠加 |
+| `CUDA error: invalid device ordinal` | `device` 写逻辑编号 `cuda:0`；`CUDA_VISIBLE_DEVICES` 会重排卡号 |
+| 缺 torchvision | `bash env/setup_venv.sh` 会 `--no-deps` 装 0.29.2 |
+| 长度差几个 token、top-5 一致 | dtype 问题：不要把 bf16 转 Python float 算预算；本轮已修 |
+| OOM | 把 `--max-pixels` 从 640² 降到 512²，并在报告里写明这是偏离 |
+
+---
+
+## 6 · 本轮禁止
+
+- 不要跑 25% 档与拆机制对照（等关卡 1 结果）。
 - 不要改 `third_party/`。
-- 不要在服务器上写 `src/` 或 `scripts/`。
-- 不要用 OpenAI API（包括判官、关键词抽取、问话人生成）。
+- 不要在服务器上写 `src/` 或 `scripts/`；要改就打印补丁交回 Mac。
+- 不要用 OpenAI API。
+- 不要为了让 SM0.5 通过而改判官 rubric。

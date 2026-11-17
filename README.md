@@ -216,14 +216,12 @@ multi-image-code/
 
 ## 八、当前状态
 
-- **2026-11-16**：仓库建立，代码骨架、协议、阶段 0 检查落地。**尚未在服务器上跑过任何 GPU 检查**。
-- 远端：`git@github.com:Ddmiurge/expriment2.git`，分支 `main`，首次提交 `5906334`。
-- 下一步（服务器上）：
-  1. `git clone git@github.com:Ddmiurge/expriment2.git`
-  2. `cd expriment2 && bash env/setup_venv.sh && source .venv/bin/activate`
-  3. `cp env/paths.example.yaml env/paths.yaml` 并填模型/数据路径
-  4. `bash scripts/check_egress.sh && bash env/fetch_third_party.sh`
-  5. `python scripts/apply_avtp_patch.py --mode instrumented`
-  6. `bash scripts/run_stage0.sh`
+- **2026-11-16**：仓库建立，代码骨架、协议、阶段 0 检查落地。
+- **2026-11-17**：阶段 0 **六项在服务器全过**。期间修了三处：判官思考模式、torchvision 依赖、
+  AVTP original/instrumented 补丁叠加；SM0.3 首跑 `217 vs 213`，根因是 bf16 被转成
+  Python float 后舍入翻转，改为保留张量运算后逐位一致。补丁与记录归档在
+  `results/archive/2026-11-17_server_patches/`。
+- 远端：`git@github.com:Ddmiurge/expriment2.git`，分支 `main`。
+- **下一步**：建攻击集 + 阶段 1 基线（见 `TASKS.md`）。关卡 1 之前不要跑 25% 档与拆机制对照。
 
 服务器只读（能 pull、不能 push）；代码改动一律在 Mac 上做、push、服务器再 pull。

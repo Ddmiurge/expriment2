@@ -83,6 +83,16 @@ def run(mode: str, out_path: Path) -> int:
             }
             for r in recs
         ]
+    else:
+        # 作者原版也带一个只记录、不参与计算的记录器
+        fp["records"] = [
+            {
+                "layer": r["layer"],
+                "n_after": None,
+                "per_image_keep_count": r["per_image_keep_count"],
+            }
+            for r in avtp.original_records()
+        ]
     out_path.write_text(json.dumps(fp, indent=2), encoding="utf-8")
     print(json.dumps(fp, indent=2))
     return 0
@@ -103,7 +113,19 @@ def compare(a: Path, b: Path) -> int:
     if rel > 1e-3:
         print(f"✗ logits 和相对差 {rel:.2e} > 1e-3")
         ok = False
+
+    # 只比总长度会掩盖「同样多、但换了一张图」的错；逐图比
+    ca = {r["layer"]: r["per_image_keep_count"] for r in fa.get("records", [])}
+    cb = {r["layer"]: r["per_image_keep_count"] for r in fb.get("records", [])}
+    if not ca or not cb:
+        print(f"✗ 记录缺失：original={len(ca)} 层，instrumented={len(cb)} 层")
+        ok = False
+    elif ca != cb:
+        print(f"✗ 每图保留数不同：original={ca} instrumented={cb}")
+        ok = False
+
     print(f"n_after={fa['n_after']} 相对差={rel:.2e} top5一致={fa['top5'] == fb['top5']}")
+    print(f"每图保留数：original={ca} instrumented={cb}")
     print("SM0.3", "通过" if ok else "失败")
     return 0 if ok else 1
 
