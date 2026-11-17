@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import random
 from pathlib import Path
 from typing import Iterable, Iterator
 
@@ -35,7 +36,10 @@ def _records_from_obj(obj, source: Path) -> Iterator[dict]:
         items = obj
     else:
         return
-    category = source.parent.name if source.name.endswith("_final.json") else ""
+    # 大类名优先取条目里的字段；没有就取文件所在目录名。
+    # MM-SafetyBench 的 question.json 通常放在 13 个类目目录下，没有 category 字段；
+    # MIR-SafetyBench 的 *_final.json 同理。
+    category = source.parent.name
     for i, it in enumerate(items):
         if not isinstance(it, dict):
             continue
@@ -76,6 +80,43 @@ def iter_instruction_records(path: str | Path) -> Iterator[dict]:
     raise ValueError(f"不认识的指令文件：{p}")
 
 
+def stratified_records(records: list[dict], limit: int | None, seed: int = 0) -> list[dict]:
+    """按 category 分层抽 limit 条，尽量让每个类目数量相同。
+
+    MM-SafetyBench tiny 是跨 13 个安全类目的分层集；随手取前 N 条会偏向
+    文件枚举顺序里的前几个类目。这里按类目等额分配，余数给排序后的前几类。
+    """
+    if limit is None or len(records) <= limit:
+        return list(records)
+    groups: dict[str, list[dict]] = {}
+    for r in records:
+        groups.setdefault(r.get("category") or "unknown", []).append(r)
+    cats = sorted(groups)
+    base, extra = divmod(limit, len(cats))
+    rng = random.Random(seed)
+    picked: list[dict] = []
+    leftovers: list[dict] = []
+    for i, cat in enumerate(cats):
+        items = sorted(groups[cat], key=lambda r: r["id"])
+        rng.shuffle(items)
+        m = base + (1 if i < extra else 0)
+        picked.extend(items[:m])
+        leftovers.extend(items[m:])
+    # 某些类目不够时，用其他类目的剩余补齐
+    if len(picked) < limit:
+        rng.shuffle(leftovers)
+        picked.extend(leftovers[: limit - len(picked)])
+    rng.shuffle(picked)
+    return picked
+
+
+def _record_seed(seed: int, rid: str) -> int:
+    """由 id 决定图片生成 seed：resume/切片顺序变了也不改已定样本。"""
+    import hashlib
+
+    return seed + int(hashlib.sha256(str(rid).encode()).hexdigest()[:8], 16) % 1_000_000
+
+
 def export(
     *,
     input_path: str | Path,
@@ -90,8 +131,43 @@ def export(
     num_images: int = 6,
     resume: bool = True,
     game_dir: str | Path | None = None,
+    stratify: bool = False,
 ) -> list[dict]:
     """把指令集变成 MIDAS 多图攻击样本。已在 out_jsonl 里的 id 默认跳过。"""
+    records = list(iter_instruction_records(input_path))
+    if stratify:
+        records = stratified_records(records, limit, seed)
+    return export_from_records(
+        records,
+        out_jsonl=out_jsonl,
+        midas_dir=midas_dir,
+        out_dir=out_dir,
+        limit=limit,
+        seed=seed,
+        keyword_mode=keyword_mode,
+        llm=llm,
+        tokenizer=tokenizer,
+        num_images=num_images,
+        resume=resume,
+        game_dir=game_dir,
+    )
+
+
+def export_from_records(
+    records: Iterable[dict],
+    *,
+    out_jsonl: str | Path,
+    midas_dir: str | Path,
+    out_dir: str | Path,
+    limit: int | None = None,
+    seed: int = 0,
+    keyword_mode: str = "rule",
+    llm=None,
+    tokenizer=None,
+    num_images: int = 6,
+    resume: bool = True,
+    game_dir: str | Path | None = None,
+) -> list[dict]:
     out_jsonl = Path(out_jsonl)
     midas_dir = Path(midas_dir)
     out_dir = Path(out_dir)
@@ -109,11 +185,13 @@ def export(
         with out_jsonl.open(encoding="utf-8") as f:
             samples = [json.loads(line) for line in f if line.strip()]
 
+    # limit 是「总样本数」，不是「本轮新增数」：resume 时已有样本要占额度
+    remaining = None if limit is None else max(0, limit - len(samples))
     n = 0
-    for rec in iter_instruction_records(input_path):
+    for rec in records:
         if rec["id"] in done:
             continue
-        if limit is not None and n >= limit:
+        if remaining is not None and n >= remaining:
             break
         if keyword_mode == "llm":
             if llm is None or tokenizer is None:
@@ -136,14 +214,14 @@ def export(
             questioner=q,
             midas_dir=midas_dir,
             out_dir=out_dir / rec["id"],
-            seed=seed + n,
+            seed=_record_seed(seed, rec["id"]),
             num_images=num_images,
             game_dir=game_dir,
         )
         sample["source"] = rec["source"]
         samples.append(sample)
         n += 1
-        print(f"[{n}] {rec['id']}: keywords={kws} images={len(sample['images'])}")
+        print(f"[{n}] {rec['id']} ({rec['category']}): keywords={kws} images={len(sample['images'])}")
 
     write_jsonl(samples, out_jsonl)
     return samples

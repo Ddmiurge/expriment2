@@ -53,7 +53,7 @@
 
 | 维度 | 取值 | 说明 |
 |---|---|---|
-| 攻击 | **MIDAS**（主）/ MIR-SafetyBench（补充） | MIR 没有显式载荷，只测 ASR；结果单独一张表，不混进 MIDAS 主表 |
+| 攻击/指令源 | **MIDAS × MM-SafetyBench tiny**（主）/ **MIR-SafetyBench**（独立泛化） | 主实验用 MM-SafetyBench 的 harmful question 构造 MIDAS 攻击（MIDAS Table 2 同源）；MIR 用自己的 `revised_prompt` + 图，只测 ASR、单独一张表 |
 | 剪枝器 | none / avtp / sieve（主）；avtp_equal / sieve_random（拆机制对照，见 §2.1） | |
 | 预算 | 0.50 / 0.25 | AVTP 用校准档（见 §7）；SIEVE 每图等额，配额按「总视觉 token × 预算 / 图数」定；图小于配额时取全图，实际预算逐次报告 |
 | 样本 | 40 条（试点）/ 120 条（确认） | 同一批样本 id 跑所有条件，配对 |
@@ -200,7 +200,9 @@ MIDAS 默认每个关键词至少 2 张图（`r≥2`）。阶段 1 只记录每�
 
 | 偏离 | 具体 | 影响 |
 |---|---|---|
+| 指令来源 | MM-SafetyBench tiny；若服务器副本没有 tiny 划分，用现有 split 按 13 类分层抽 40 | 不是官方 tiny；报告里必须写明 |
 | MIDAS 关键词/问话人本地化 | 用 Qwen3-8B 按原文 prompt 抽取；失败时退规则抽取 | 攻击措辞与原文不同，强度可能略低 |
+| 判官口径 | 我们的四档 Qwen3-8B vs MIDAS 的 0–5 分 / 阈值 ≥3 / GPT-5-nano | **绝对 ASR 不能和 MIDAS Table 2 对表**；只做同批条件的配对比较 |
 | 游戏子集 | 只用 4 个自包含游戏；2 个需要家居照片的默认不用 | 图像分布变窄 |
 | SIEVE 只复现分配规则 | 不做解码器前的平均池化（用第 0 层剪枝近似），不做图内合并 | 只能称 `sieve-alloc`，不能称 SIEVE 全方法 |
 | AVTP 25% 档 | `[0.8, 0.60, 0.52]` ≈ 0.2496 | 不是原文数字 |

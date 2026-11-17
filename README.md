@@ -21,7 +21,8 @@
 | 剪枝器 A | **AVTP**（作者代码） | 唯一有真代码的多图剪枝器；**图级自适应预算**，图与图争预算 |
 | 剪枝器 B | **SIEVE-alloc**（本仓库实现） | SIEVE 无代码；先复现它最关键的一条规则——**每图等额配额**（按总预算平均到每图，图与图不争预算） |
 | 攻击 | **MIDAS**（作者代码，离线改造） | 多图越狱，载荷分散在多张图、每词至少 2 张，正好检验「备份抗删除」 |
-| 基准补充 | **MIR-SafetyBench** | 2,676 条多图安全样本，用于样本不足时配对补充 |
+| 指令来源（主实验） | **MM-SafetyBench tiny** | MIDAS Table 2 同源；只取 harmful question，图由 MIDAS 生成；按 13 类分层抽 40 |
+| 泛化基准（单独表） | **MIR-SafetyBench** | 用自己的 `revised_prompt` + 图，不抽问题喂 MIDAS |
 | 判官 | **Qwen3-8B**（本地） | 与单图线同一个判官模型，换 prompt；同会话、贪心解码 |
 
 **两个必须记住的版本事实**：
@@ -115,7 +116,8 @@ python scripts/run_stage1.py --pruner sieve_random --budget 0.5 --limit 40 --out
 
 全条件顺序跑用 `bash scripts/run_all_stage1.sh`（`ONLY=avtp|sieve|ablation|none` 可选）。
 
-MIR-SafetyBench 作为补充基准（没有显式载荷，只测 ASR）：
+MIR-SafetyBench 是**独立的泛化基准**，不是 MIDAS 的指令源：用它自己的多图 prompt + 图片，
+没有显式载荷，只测 ASR。结果单独一张表，不混进 MM-SafetyBench 主表。
 
 ```bash
 python scripts/run_stage1.py --attack mir --samples /path/to/MIR-SafetyBench \

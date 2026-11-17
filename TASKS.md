@@ -41,16 +41,27 @@ python scripts/sm0_3_avtp_equivalence.py --compare /tmp/orig.json /tmp/inst.json
 
 ---
 
-## 1 · 准备指令集（二选一）
+## 1 · 准备指令集（主实验：MM-SafetyBench tiny）
 
-- **MM-SafetyBench**（单图线已有，服务器上直接可用）：
-  `--input <MM-SafetyBench 的 json 路径>`
-- **MIR-SafetyBench**：
-  ```bash
-  export HUGGINGFACE_TOKEN=...
-  python third_party/mir-safetybench/extract_data.py --output /path/to/MIR-SafetyBench
-  ```
-  然后 `--input /path/to/MIR-SafetyBench`
+**为什么是 MM-SafetyBench**：MIDAS 论文的 Table 2 就是在 **MM-SafetyBench (tiny)**
+上评的；这是三个官方评测集之一（Table 1 HADES、Table 2 MM-SafetyBench、Table 3 AdvBench）。
+服务器上单图线已经有一份，零准备成本。
+
+**必须注意的三点**：
+
+1. **只借问题，不借图**。我们取 MM-SafetyBench 的 harmful question，图全部由 MIDAS 自己生成。
+   论文里要写「用 MM-SafetyBench 问题构造的 MIDAS 攻击」，不能写成「MM-SafetyBench 上的结果」。
+2. **优先用官方 tiny split**。如果服务器副本里有 tiny 划分，就用它；没有的话用现有 split
+   按 13 个类目分层抽 40 条（`build_attack_set.py` 默认 `--stratify`），并在报告里写明
+   「不是官方 tiny」。
+3. **判官口径不同**：MIDAS 用 0–5 分、阈值 ≥3、GPT-5-nano；我们用四档、Qwen3-8B。
+   所以绝对 ASR 不能和 Table 2 对表，只能看同一批条件下开/关剪枝的差。
+
+**路径**：服务器上 MM-SafetyBench 的根目录（单图线的 `env/paths.yaml` 里有）。
+`--input` 传它的目录或对应 json。
+
+MIR-SafetyBench **不当指令源**；它是独立的多图攻击基准，放在阶段 1 的单独泛化表里，
+用它自己的 `revised_prompt` + 图片。
 
 先跑 40 条试点。指令集要**固定下来**，后面所有条件都用同一批 id。
 
@@ -60,9 +71,9 @@ python scripts/sm0_3_avtp_equivalence.py --compare /tmp/orig.json /tmp/inst.json
 
 ```bash
 python scripts/build_attack_set.py \
-    --input <MM-SafetyBench 或 MIR-SafetyBench 路径> \
+    --input <MM-SafetyBench 路径> \
     --out data/midas/attack_set.jsonl \
-    --limit 40 --keyword-mode llm
+    --limit 40 --keyword-mode llm --stratify
 ```
 
 - `--keyword-mode llm` 用本地 Qwen3-8B 按 MIDAS 原文 prompt 抽词；`rule` 只用于快速冒烟。
