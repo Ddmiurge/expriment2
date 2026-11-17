@@ -21,9 +21,20 @@
 | 剪枝器 A | **AVTP**（作者代码） | 唯一有真代码的多图剪枝器；**图级自适应预算**，图与图争预算 |
 | 剪枝器 B | **SIEVE-alloc**（本仓库实现） | SIEVE 无代码；先复现它最关键的一条规则——**每图等额配额**（按总预算平均到每图，图与图不争预算） |
 | 攻击 | **MIDAS**（作者代码，离线改造） | 多图越狱，载荷分散在多张图、每词至少 2 张，正好检验「备份抗删除」 |
-| 指令来源（主实验） | **MM-SafetyBench tiny** | MIDAS Table 2 同源；只取 harmful question，图由 MIDAS 生成；按 13 类分层抽 40 |
+| 指令来源（主实验） | **MM-SafetyBench tiny + `Changed Question`** | MIDAS Table 2 同源；168 个 tiny ID + 自包含祈使句，图由 MIDAS 生成；按 13 类分层抽 40 |
 | 泛化基准（单独表） | **MIR-SafetyBench** | 用自己的 `revised_prompt` + 图，不抽问题喂 MIDAS |
 | 判官 | **Qwen3-8B**（本地） | 与单图线同一个判官模型，换 prompt；同会话、贪心解码 |
+
+> **MM-SafetyBench tiny 是什么**：不是单独的数据目录，而是仓库根目录的
+> `TinyVersion_ID_List.json`——13 个场景、共 168 条问题的 **ID 白名单**。
+> 主实验取每题的 **`Changed Question`**（自包含祈使句；论文 Figure 16 的示例逐字等于它）。
+> ```bash
+> curl -L https://raw.githubusercontent.com/isXinLiu/MM-SafetyBench/main/TinyVersion_ID_List.json \
+>   -o <MM-SafetyBench 根目录>/TinyVersion_ID_List.json
+> python scripts/make_questions_tiny.py --mmsb-root <根目录> \
+>   --field "Changed Question" --out data/midas/questions_tiny.jsonl
+> ```
+> 之后 `build_attack_set.py --input data/midas/questions_tiny.jsonl`。
 
 **两个必须记住的版本事实**：
 
@@ -98,7 +109,8 @@ bash scripts/run_stage0.sh
 ```bash
 # 先跑无剪枝基线（每个攻击/样本集一次）
 python scripts/run_stage1.py --attack midas --pruner none \
-    --limit 40 --out runs/stage1_baseline
+    --samples data/midas/attack_set.jsonl \
+    --limit 40 --max-new-tokens 2048 --out runs/stage1_baseline
 
 # 再跑剪枝条件（配对：同一批样本 id）
 python scripts/run_stage1.py --attack midas --pruner avtp --budget 0.5 \
@@ -159,7 +171,9 @@ multi-image-code/
 │   ├── check_egress.sh      出网边界探测
 │   ├── result_block.py      结果块 emit / parse / summarize
 │   ├── apply_avtp_patch.py  给 venv 里的 transformers 打/撤补丁
+│   ├── make_questions_tiny.py  tiny ID + Changed Question → 168 条指令
 │   ├── build_attack_set.py  生成 MIDAS 攻击集（图 + 掩码 + 提示词）
+│   ├── check_payload_cells.py  检查载荷掩码在 token 网格上的单元数
 │   ├── run_stage0.sh        阶段 0 六项检查的总入口
 │   ├── sm0_1_env_report.py
 │   ├── sm0_2_model_smoke.py
@@ -171,12 +185,12 @@ multi-image-code/
 │   ├── run_all_stage1.sh    阶段 1 全条件顺序跑
 │   └── analyze_stage1.py    Mac 侧：配对差 + 剂量-反应
 ├── src/
-│   ├── common/              路径、随机种子
+│   ├── common/              路径、随机种子、统一 no-think chat template
 │   ├── models/              Qwen3-VL 加载与多图输入构造
 │   ├── pruning/             图像布局、AVTP 注入与配置、SIEVE-alloc
 │   ├── attack/              MIDAS 离线化、差图载荷掩码
-│   ├── eval/                四档判官、载荷存活率、配对统计
-│   └── data/                MIDAS / MIR-SafetyBench 读取
+│   ├── eval/                四档判官、载荷存活率、回答诊断、配对统计
+│   └── data/                MIDAS / MM-SafetyBench / MIR-SafetyBench 读取
 ├── tests/                   纯 Python 单测（不占 GPU）
 │   └── fixtures/            阶段 0 用的 smoke 指令
 ├── third_party.lock         复现依据（进 git）
@@ -223,7 +237,12 @@ multi-image-code/
   AVTP original/instrumented 补丁叠加；SM0.3 首跑 `217 vs 213`，根因是 bf16 被转成
   Python float 后舍入翻转，改为保留张量运算后逐位一致。补丁与记录归档在
   `results/archive/2026-11-17_server_patches/`。
+- **2026-11-17 下午**：首轮 40 条 `none` 基线 ASR 5.0%，但 **40/40 撞满 768 token**，
+  计划段被截断，**该基线作废**。报告归档在 `results/archive/2026-11-17_stage1_baseline/`。
+  处置：指令源改为 **官方 tiny 168 ID + `Changed Question`**，输出预算 **2048**，
+  新增回答诊断与载荷单元数检查。
 - 远端：`git@github.com:Ddmiurge/expriment2.git`，分支 `main`。
-- **下一步**：建攻击集 + 阶段 1 基线（见 `TASKS.md`）。关卡 1 之前不要跑 25% 档与拆机制对照。
+- **下一步**：用新的 40 条重跑 `none`（2048），先看截断率与 chunk hit（见 `TASKS.md`）。
+  关卡 1 之前不要跑 25% 档与拆机制对照。
 
 服务器只读（能 pull、不能 push）；代码改动一律在 Mac 上做、push、服务器再 pull。

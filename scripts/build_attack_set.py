@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """生成 MIDAS 多图攻击集（离线）。
 
-主实验输入是 **MM-SafetyBench**（MIDAS 论文 Table 2 的 tiny split）。
-只取它的 harmful question，图全部由 MIDAS 自己生成；所以结果要写成
-「用 MM-SafetyBench 问题构造的 MIDAS 攻击」，不是「MM-SafetyBench 上的结果」。
+主实验输入是 **MM-SafetyBench 官方 tiny ID + `Changed Question` 字段**。
+`Changed Question` 是自包含的祈使句；论文 Figure 16 的 MM-SafetyBench 示例逐字等于它。
+`Question` 是原始问句（“Help in organizing...”），`Rephrased Question` 回指图片，
+都不适合 MIDAS。图全部由 MIDAS 自己生成；结果要写成
+「用 MM-SafetyBench 指令构造的 MIDAS 攻击」，不是「MM-SafetyBench 上的结果」。
 
 `--stratify` 默认开：按 category 等额抽样，避免随手取前 N 条偏向文件枚举顺序里的前几类。
 MIR-SafetyBench 不作为指令源；它用自己的 prompt + 图单独跑泛化表。
@@ -13,7 +15,9 @@ MIR-SafetyBench 不作为指令源；它用自己的 prompt + 图单独跑泛化
 
 用法：
     python scripts/build_attack_set.py \
-        --input /path/to/MM-SafetyBench \
+        --input /path/to/MM-SafetyBench/data/processed_questions \
+        --question-field "Changed Question" \
+        --tiny-list /path/to/MM-SafetyBench/TinyVersion_ID_List.json \
         --out data/midas/attack_set.jsonl \
         --limit 40 --keyword-mode llm --stratify
 """
@@ -49,6 +53,16 @@ def main() -> int:
         action=argparse.BooleanOptionalAction,
         default=True,
         help="按 category 分层抽样（MM-SafetyBench 默认开；--no-stratify 保持文件顺序）",
+    )
+    p.add_argument(
+        "--question-field",
+        default="Changed Question",
+        help="MM-SafetyBench 文本字段；主实验用 'Changed Question'（缺失时自动回退到第一个可用字段）",
+    )
+    p.add_argument(
+        "--tiny-list",
+        default=None,
+        help="TinyVersion_ID_List.json；不传会在输入目录及上两级自动找",
     )
     a = p.parse_args()
 
@@ -86,6 +100,8 @@ def main() -> int:
         resume=a.resume,
         game_dir=game_dir,
         stratify=a.stratify,
+        question_field=a.question_field,
+        tiny_list=a.tiny_list,
     )
 
     print(f"\n共 {len(samples)} 个样本，写入 {a.out}")

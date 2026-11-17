@@ -169,8 +169,12 @@ def questioner_fixed(instruction: str) -> str:
 def _generate_text(model, tokenizer, prompt: str, max_new_tokens: int = 64) -> tuple[str, str]:
     import torch
 
+    from ..common.chat import apply_chat_template_no_think
+
     messages = [{"role": "user", "content": prompt}]
-    text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    text = apply_chat_template_no_think(
+        tokenizer, messages, tokenize=False, add_generation_prompt=True
+    )
     inputs = tokenizer([text], return_tensors="pt").to(model.device)
     with torch.no_grad():
         out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)

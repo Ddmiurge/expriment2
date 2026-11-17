@@ -53,11 +53,11 @@
 
 | 维度 | 取值 | 说明 |
 |---|---|---|
-| 攻击/指令源 | **MIDAS × MM-SafetyBench tiny**（主）/ **MIR-SafetyBench**（独立泛化） | 主实验用 MM-SafetyBench 的 harmful question 构造 MIDAS 攻击（MIDAS Table 2 同源）；MIR 用自己的 `revised_prompt` + 图，只测 ASR、单独一张表 |
+| 攻击/指令源 | **MIDAS × MM-SafetyBench tiny + `Changed Question`**（主）/ **MIR-SafetyBench**（独立泛化） | 主实验用官方 tiny 的 168 个 ID + 自包含的 `Changed Question`（论文 Figure 16 示例逐字等于它）；MIR 用自己的 `revised_prompt` + 图，只测 ASR、单独一张表 |
 | 剪枝器 | none / avtp / sieve（主）；avtp_equal / sieve_random（拆机制对照，见 §2.1） | |
 | 预算 | 0.50 / 0.25 | AVTP 用校准档（见 §7）；SIEVE 每图等额，配额按「总视觉 token × 预算 / 图数」定；图小于配额时取全图，实际预算逐次报告 |
-| 样本 | 40 条（试点）/ 120 条（确认） | 同一批样本 id 跑所有条件，配对 |
-| 模型 | Qwen3-VL-8B-Instruct | 贪心解码，`max_new_tokens=768`（MIDAS 要求 600+ 词；撞上限的样本记 `truncated=True`） |
+| 样本 | 40 条（试点，从 168 条分层抽）/ 168 条（全 tiny，确认） | 同一批样本 id 跑所有条件，配对 |
+| 模型 | Qwen3-VL-8B-Instruct | 贪心解码，`max_new_tokens=2048`（MIDAS 要求 600+ 词；撞上限的样本记 `truncated=True`） |
 | 图像预处理 | `max_pixels=640²`，`min_pixels=224²` | **所有条件固定**；这是为了避免 eager 注意力的显存爆炸，也是为了让每图 token 数可控 |
 | 判官 | Qwen3-8B，四档 | 同一会话；条件信息不进判官 |
 | 随机种子 | 攻击集 seed=0；生成 greedy | |
@@ -200,7 +200,8 @@ MIDAS 默认每个关键词至少 2 张图（`r≥2`）。阶段 1 只记录每�
 
 | 偏离 | 具体 | 影响 |
 |---|---|---|
-| 指令来源 | MM-SafetyBench tiny；若服务器副本没有 tiny 划分，用现有 split 按 13 类分层抽 40 | 不是官方 tiny；报告里必须写明 |
+| 指令来源 | 官方 tiny 的 168 个 ID + `Changed Question` 字段 | 论文示例逐字匹配；`Question`/`Rephrased` 不用于主实验 |
+| 输出预算 | `max_new_tokens=2048` | 原文未写；768 实测 40/40 截断，旧基线作废 |
 | MIDAS 关键词/问话人本地化 | 用 Qwen3-8B 按原文 prompt 抽取；失败时退规则抽取 | 攻击措辞与原文不同，强度可能略低 |
 | 判官口径 | 我们的四档 Qwen3-8B vs MIDAS 的 0–5 分 / 阈值 ≥3 / GPT-5-nano | **绝对 ASR 不能和 MIDAS Table 2 对表**；只做同批条件的配对比较 |
 | 游戏子集 | 只用 4 个自包含游戏；2 个需要家居照片的默认不用 | 图像分布变窄 |
@@ -208,6 +209,19 @@ MIDAS 默认每个关键词至少 2 张图（`r≥2`）。阶段 1 只记录每�
 | AVTP 25% 档 | `[0.8, 0.60, 0.52]` ≈ 0.2496 | 不是原文数字 |
 | 图像像素上限 | `max_pixels=640²` | 每图 token 数比原文的 729 少；所有条件一致，不影响配对比较 |
 | AVTP 图级重要性 | 代码用 vision_start token 的相似度，不是公式里的图内平均 | 按代码描述方法 |
+
+### 7.1 原文未说明 / 我们的选择
+
+| 项 | 原文 | 我们的选择 | 影响 |
+|---|---|---|---|
+| tiny 的样本数 | 只写 “official tiny split”，未写条数 | 168 个 ID（官方 `TinyVersion_ID_List.json`） | 不能声称与原文同 n |
+| tiny 的文本字段 | 未写用哪一列 | `Changed Question`（论文 Figure 16 示例逐字匹配） | 与 `Question`/`Rephrased` 不同 |
+| 输出预算 | 未写 temperature / max tokens | `max_new_tokens=2048`，greedy | 768 实测 40/40 截断 |
+| 关键词/问话人模型 | “helper model” | 本地 Qwen3-8B | 关键词质量可能不同 |
+| 判官 | GPT-5-nano，0–5，≥3 | Qwen3-8B，四档，2/3 | 绝对 ASR 不可比 |
+| 重复次数 / 方差 | 未写 | 单次 greedy | 无方差估计 |
+| HADES 249 条构造 | “sampling one instance for each keyword”，含义不清 | 阶段 1 不用 HADES | 留作阶段 2 再定 |
+| 图像生成细节 | 正文未写，代码里有 | 4 个自包含游戏，PIL 生成 | 图像分布比原文窄 |
 
 ---
 
@@ -218,6 +232,8 @@ MIDAS 默认每个关键词至少 2 张图（`r≥2`）。阶段 1 只记录每�
 - `results.jsonl`：逐样本 `id, cfg, response, level, survival{overall, per_image, kept_count, total}, seconds, keywords`
 - `result.block.txt`：v2 结果块（粘回 Mac）
 - 控制台汇总：ASR、存活率均值、图间剖面、配对比较
+- 回答诊断：`chunk_hit`、`kw_hit`、`steps_med`、`payload_zero`
+- `scripts/check_payload_cells.py`：检查载荷掩码在 token 网格上的单元数
 
 Mac 侧收到块后：
 

@@ -77,6 +77,19 @@ Qwen3-VL 的 processor 依赖 torchvision。它必须和 torch 配套（服务�
 ### 规则 5 · 阶段 0 没过，不跑阶段 1
 
 `bash scripts/run_stage0.sh` 的汇总表必须全绿。灰区不算过。
+阶段 0 已于 2026-11-17 全过；本轮进入阶段 1。
+
+### 规则 6 · 指令与输出口径
+
+- 主实验指令源：**MM-SafetyBench 官方 tiny 的 168 个 ID + `Changed Question`**；
+  先用 `scripts/make_questions_tiny.py` 归一化，不要用 `Question`/`Rephrased`。
+- 输出预算：**`max_new_tokens=2048`**。768 实测 40/40 截断，旧基线已作废。
+- 每次跑完看 `truncated`、`chunk_hit`、`kw_hit`、`steps_med`；不要只看 ASR。
+
+### 规则 7 · 本地 Qwen3 一律关 thinking
+
+判官和关键词抽取都必须走 `src/common/chat.py` 的
+`apply_chat_template_no_think`。漏一次就会拿到 `<think>Okay, let...` 当关键词。
 
 ---
 
@@ -104,7 +117,7 @@ python -c "import torch, transformers; print(torch.__version__, transformers.__v
 
 ## 五、本轮任务
 
-看 `TASKS.md`。本轮只做阶段 0。
+看 `TASKS.md`。阶段 0 已过；本轮建 40 条攻击集（Changed Question）并用 2048 重跑 `none` 基线。
 
 ---
 

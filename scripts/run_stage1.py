@@ -34,6 +34,12 @@ from src.common.paths import model_path, runtime  # noqa: E402
 from src.common.seed import set_seed  # noqa: E402
 from src.data.midas import load_samples, validate_sample  # noqa: E402
 from src.data.mir import load_mir_samples  # noqa: E402
+from src.eval.response_metrics import (  # noqa: E402
+    chunk_hit_stats,
+    keyword_hit_stats,
+    plan_step_count,
+    summarize as summarize_response,
+)
 from src.eval.stats import paired_test  # noqa: E402
 from src.eval.survival import (  # noqa: E402
     SampleSurvival,
@@ -203,6 +209,8 @@ def main() -> int:
             for im in s["images"]
         ]
         surv = compute_survival(kept, grids, masks)
+        chunk = chunk_hit_stats(s, response)
+        kw = keyword_hit_stats(s, response)
         rec = {
             "key": key,
             "id": s["id"],
@@ -224,6 +232,15 @@ def main() -> int:
             },
             "seconds": round(time.time() - t0, 2),
             "truncated": truncated,
+            "chunk_hits": chunk["hits"],
+            "chunk_total": chunk["total"],
+            "chunk_hit_rate": chunk["rate"],
+            "keyword_hits": kw["hits"],
+            "keyword_total": kw["total"],
+            "keyword_hit_rate": kw["rate"],
+            "plan_steps": plan_step_count(response),
+            "payload_cells": surv.payload_counts,
+            "mask_present": [m is not None for m in masks],
             "keywords": s.get("keywords", []),
             # 每个关键词分到了几张图（MIDAS 的备份数 r）；阶段 1 只记录，不操纵
             "backup_counts": {
@@ -276,6 +293,16 @@ def main() -> int:
     order = {s["id"]: i for i, s in enumerate(samples)}
     truncated_n = sum(1 for r in rows if r.get("truncated"))
     judge_fail_n = sum(1 for r in rows if r.get("judge_raw") == "PARSE_FAIL")
+    resp_summary = summarize_response(rows)
+    payload_all = [
+        c
+        for r in rows
+        for c, has in zip(r.get("payload_cells", []), r.get("mask_present", []))
+        if has
+    ]
+    payload_zero = (
+        sum(1 for c in payload_all if c == 0) / len(payload_all) if payload_all else None
+    )
     rows = [r for r in rows if r.get("level") is not None]
     rows.sort(key=lambda r: order.get(r["id"], 10**9))
     if not rows:
@@ -322,6 +349,10 @@ def main() -> int:
             "sample_set": sample_set,
             "truncated": truncated_n,
             "judge_fail": judge_fail_n,
+            "chunk_hit": "n/a" if resp_summary["chunk_hit"] is None else f"{resp_summary['chunk_hit']:.4f}",
+            "kw_hit": "n/a" if resp_summary["kw_hit"] is None else f"{resp_summary['kw_hit']:.4f}",
+            "steps_med": "n/a" if resp_summary["steps_med"] is None else f"{resp_summary['steps_med']:.1f}",
+            "payload_zero": "n/a" if payload_zero is None else f"{payload_zero:.4f}",
         },
         kind="asr",
     )

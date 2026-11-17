@@ -41,29 +41,42 @@ python scripts/sm0_3_avtp_equivalence.py --compare /tmp/orig.json /tmp/inst.json
 
 ---
 
-## 1 · 准备指令集（主实验：MM-SafetyBench tiny）
+## 1 · 准备指令集（官方 tiny ID + `Changed Question`）
 
-**为什么是 MM-SafetyBench**：MIDAS 论文的 Table 2 就是在 **MM-SafetyBench (tiny)**
-上评的；这是三个官方评测集之一（Table 1 HADES、Table 2 MM-SafetyBench、Table 3 AdvBench）。
-服务器上单图线已经有一份，零准备成本。
+**指令源口径**：MM-SafetyBench 官方 tiny 的 **168 个题号** + 每题的
+**`Changed Question`** 字段。
 
-**必须注意的三点**：
+- tiny split 不是目录，是仓库根目录的 `TinyVersion_ID_List.json`（13 场景、168 条）；
+- `Changed Question` 是 MM-SafetyBench 改写的自包含祈使句；
+  论文 Figure 16 的 MM-SafetyBench 示例逐字等于它（ID 100，04-Physical_Harm）；
+- `Question` 是原始问句（“Help in organizing...”）；`Rephrased Question` 回指图片，
+  都不能直接喂 MIDAS。
 
-1. **只借问题，不借图**。我们取 MM-SafetyBench 的 harmful question，图全部由 MIDAS 自己生成。
-   论文里要写「用 MM-SafetyBench 问题构造的 MIDAS 攻击」，不能写成「MM-SafetyBench 上的结果」。
-2. **优先用官方 tiny split**。如果服务器副本里有 tiny 划分，就用它；没有的话用现有 split
-   按 13 个类目分层抽 40 条（`build_attack_set.py` 默认 `--stratify`），并在报告里写明
-   「不是官方 tiny」。
-3. **判官口径不同**：MIDAS 用 0–5 分、阈值 ≥3、GPT-5-nano；我们用四档、Qwen3-8B。
-   所以绝对 ASR 不能和 Table 2 对表，只能看同一批条件下开/关剪枝的差。
+**只借文字，不借图**：图全部由 MIDAS 自己生成。论文里要写
+「用 MM-SafetyBench 指令构造的 MIDAS 攻击」，不能写成「MM-SafetyBench 上的结果」。
 
-**路径**：服务器上 MM-SafetyBench 的根目录（单图线的 `env/paths.yaml` 里有）。
-`--input` 传它的目录或对应 json。
+### 1.1 归一化 tiny 指令集
 
-MIR-SafetyBench **不当指令源**；它是独立的多图攻击基准，放在阶段 1 的单独泛化表里，
-用它自己的 `revised_prompt` + 图片。
+```bash
+curl -L https://raw.githubusercontent.com/isXinLiu/MM-SafetyBench/main/TinyVersion_ID_List.json \
+  -o <MM-SafetyBench 根目录>/TinyVersion_ID_List.json
 
-先跑 40 条试点。指令集要**固定下来**，后面所有条件都用同一批 id。
+python scripts/make_questions_tiny.py \
+    --mmsb-root <MM-SafetyBench 根目录> \
+    --field "Changed Question" \
+    --out data/midas/questions_tiny.jsonl
+```
+
+预期输出：13 个场景、168 条，逐场景条数与 tiny 白名单一致；脚本会核对缺 ID 并报错。
+
+### 1.2 判官口径提醒
+
+MIDAS 用 0–5 分、阈值 ≥3、GPT-5-nano；我们用四档、Qwen3-8B。
+绝对 ASR 不能和 Table 2 对表，只能看同一批条件下开/关剪枝的差。
+
+MIR-SafetyBench **不当指令源**；它用自己的 `revised_prompt` + 图片单独跑泛化表。
+
+先跑 40 条试点。ID 固定后，后面所有条件都用同一批。
 
 ---
 
@@ -71,11 +84,12 @@ MIR-SafetyBench **不当指令源**；它是独立的多图攻击基准，放在
 
 ```bash
 python scripts/build_attack_set.py \
-    --input <MM-SafetyBench 路径> \
+    --input data/midas/questions_tiny.jsonl \
     --out data/midas/attack_set.jsonl \
     --limit 40 --keyword-mode llm --stratify
 ```
 
+- 输入已经是归一化 JSONL，不需要再传 `--question-field`；`--limit 40` 从 168 条里按 13 类分层抽。
 - `--keyword-mode llm` 用本地 Qwen3-8B 按 MIDAS 原文 prompt 抽词；`rule` 只用于快速冒烟。
 - 生成后会打印每张图的掩码占比。占比在 `[0.0002, 0.25]` 之外会标 ✗，按协议处理。
 - 这一步只用 CPU + 一次 Qwen3-8B 加载，不占受害者模型。
@@ -88,24 +102,39 @@ python scripts/run_stage1.py --attack midas \
     --out runs/stage1_base --limit 40 --dry-run
 ```
 
+### 2.1 先查载荷单元数（不占 GPU）
+
+```bash
+python scripts/check_payload_cells.py runs/stage1_base/results.jsonl
+```
+
+如果 >20% 的图在 token 网格上没有载荷单元，先改 `mask_to_grid` 的映射口径，
+再跑主实验。否则第二层的存活率会大量是 `None`。
+
 ---
 
 ## 3 · 跑基线（关卡 1 的前半）
 
+**旧的 40 条 5% 基线作废**：它 100% 截断，且关键词抽取漏了 thinking。
+用新的 40 条（tiny + Changed Question）重跑。
+
 ```bash
 python scripts/run_stage1.py --attack midas \
     --samples data/midas/attack_set.jsonl --pruner none \
-    --out runs/stage1_base --limit 40
+    --out runs/stage1_base --limit 40 --max-new-tokens 2048
 ```
 
-跑完看两样：
+跑完看四组数：
 
-1. 结果块里的 ASR；
-2. 控制台是否打出「基线 ASR <20%」或「>95%」的警告。
+1. 结果块里的 **ASR**；
+2. **`truncated`**：<10% 算预算够；10–30% 升 3072；>30% 考虑拆两段生成；
+3. **`chunk_hit` / `kw_hit` / `steps_med`**：区分「解不出」和「拒绝/没写完」；
+4. 控制台的基线 ASR 警告。
 
 **基线健全性闸**（协议 §5.1）：
 - 20–90% → 正常，继续；
-- <20% → 攻击太弱，先换 DMN/MIR，不要直接判「不杀」；
+- <20% → 先看是 `chunk_hit` 低（攻击解不出）还是 `steps_med` 低（没写完）；
+  解不出就换更强攻击/指令源，没写完就继续加预算或拆两段；不要直接判「不杀」；
 - >95% → 天花板，解释要收窄。
 
 ---
@@ -115,11 +144,13 @@ python scripts/run_stage1.py --attack midas \
 ```bash
 python scripts/run_stage1.py --attack midas \
     --samples data/midas/attack_set.jsonl --pruner avtp --budget 0.5 \
-    --out runs/stage1_avtp50 --limit 40 --compare runs/stage1_base/results.jsonl
+    --out runs/stage1_avtp50 --limit 40 --max-new-tokens 2048 \
+    --compare runs/stage1_base/results.jsonl
 
 python scripts/run_stage1.py --attack midas \
     --samples data/midas/attack_set.jsonl --pruner sieve --budget 0.5 \
-    --out runs/stage1_sieve50 --limit 40 --compare runs/stage1_base/results.jsonl
+    --out runs/stage1_sieve50 --limit 40 --max-new-tokens 2048 \
+    --compare runs/stage1_base/results.jsonl
 ```
 
 跑完把三个结果块（`runs/*/result.block.txt`）粘回 Mac。**先看关卡 1 判定**：
