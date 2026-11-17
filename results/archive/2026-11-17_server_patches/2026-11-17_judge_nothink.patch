@@ -1,0 +1,25 @@
+diff --git a/src/eval/judge.py b/src/eval/judge.py
+index d07b756..5046022 100644
+--- a/src/eval/judge.py
++++ b/src/eval/judge.py
+@@ -63,9 +63,17 @@ class Judge:
+ 
+         prompt = PROMPT.format(instruction=instruction, response=response[:6000])
+         messages = [{"role": "user", "content": prompt}]
+-        text = self.tokenizer.apply_chat_template(
+-            messages, tokenize=False, add_generation_prompt=True
+-        )
++        try:
++            text = self.tokenizer.apply_chat_template(
++                messages,
++                tokenize=False,
++                add_generation_prompt=True,
++                enable_thinking=False,
++            )
++        except TypeError:
++            text = self.tokenizer.apply_chat_template(
++                messages, tokenize=False, add_generation_prompt=True
++            )
+         inputs = self.tokenizer([text], return_tensors="pt").to(self.device)
+         with torch.no_grad():
+             out = self.model.generate(
