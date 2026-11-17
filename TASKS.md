@@ -55,7 +55,9 @@ bash scripts/run_stage0.sh
 | SM0.2 图片数/字母不对 | 先换更清楚的合成图；再检查 processor 版本 | 不要改 `src/models/qwen3vl.py` 的 chat template 去硬凑 |
 | SM0.3 不等价 | 对照注入代码的层号/预算/排序方向 | 不要调 `sm0_3` 的容差让它过 |
 | SM0.4 掩码越界 | 记录是哪张图、哪个游戏、占比多少 | 不要放宽 `validate_sample` 的阈值 |
+| SM0.5 判官 raw 以 `<think>` 开头 | 确认 `src/eval/judge.py` 已传 `enable_thinking=False` | 不要靠加大 `max_new_tokens` 把思考前缀挤掉 |
 | SM0.5 判官方向错 | 人工看 20 条 raw，再报告 | 不要改 rubric 让 smoke 过 |
+| `apply_avtp_patch --check` 报 original | 先 `--revert`，再 `--mode instrumented` | 不要直接重打（会叠成两份 `img_start_pos`） |
 | 任何需要改 `src/` 的 | 把补丁打印出来，交回 Mac | 不要在服务器上直接改 |
 
 ---

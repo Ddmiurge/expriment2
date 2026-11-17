@@ -7,6 +7,9 @@
 # torch 不进这里：venv 用 --system-site-packages 复用服务器已装好的 CUDA torch。
 # 装之前先确认 `python -c "import torch; print(torch.__version__, torch.cuda.is_available())"` 是 True。
 #
+# torchvision 也不进这里：它必须和 torch 的 ABI 配套（服务器实测 0.29.2 / torch 2.14.1），
+# 由 env/setup_venv.sh 用 `pip install --no-deps` 单独装，避免 pip 顺手换掉 torch。
+#
 # tokenizers / huggingface_hub / safetensors 不写死：让 transformers 自己拉兼容版本，
 # 手写版本号很容易和 4.57.1 的约束打架。
 

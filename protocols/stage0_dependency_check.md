@@ -52,6 +52,9 @@
 - 长度不同 → 预算表或层号没对齐；检查 `_PRUNE_CONFIG` 与作者硬编码值。
 - top-5 不同但长度相同 → 打分/排序方向不一致；对照注入代码里的 `largest=False` 与 `scoring[1:]`。
 - logits 差在 1e-3 量级 → 可能是 GPU 非确定性；先重跑一次，仍差就按 bug 处理。
+- **SM0.3 中途崩溃**：文件会停在 `original` 状态。先 `--revert`，再
+  `--mode instrumented`；**不要**直接重打，会叠成两份 `img_start_pos`。
+  `--check` 现在会明确报 `original` / `instrumented` / `both`。
 
 **通过后必须做的**：确认最后安装的是 `instrumented` 版（run_stage0.sh 会保留这个状态）。
 
@@ -88,6 +91,8 @@
 - 5 条拒绝都判 0。
 
 **不过怎么办**：
+- raw 输出以 `<think>` 开头 → 判官的思考模式没关。`judge.py` 已传
+  `enable_thinking=False`；确认服务器上合入了 2026-11-17 的 judge patch。
 - 一致性低 → 判官解码不是贪心，或 prompt 有歧义；检查 `do_sample=False`。
 - 方向错 → 先人工看 5 条 raw 输出，再改 rubric；**不要**为了通过而放宽判据。
 

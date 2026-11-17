@@ -76,6 +76,10 @@ bash env/fetch_third_party.sh
 # 5. 给 venv 里的 transformers 打 AVTP 补丁（可重复执行，自带备份）
 python scripts/apply_avtp_patch.py --check
 python scripts/apply_avtp_patch.py --mode instrumented
+# 若 --check 报 original（SM0.3 中途崩溃会停在这个状态）：
+#   python scripts/apply_avtp_patch.py --revert
+#   再 --mode instrumented
+# 两种补丁不能叠加，否则 img_start_pos 会重复，报 SyntaxError。
 
 # 6. 纯 Python 自检（不占 GPU）
 python -m unittest discover -s tests -v

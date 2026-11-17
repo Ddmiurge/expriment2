@@ -29,8 +29,7 @@ results/*
 !results/.gitkeep
 results/inbox/*
 !results/inbox/.gitkeep
-results/archive/*
-!results/archive/.gitkeep
+# archive 目录已被上面重新包含；里面的报告与补丁记录要进 git，不要再整目录忽略
 
 # ── Python ─────────────────────────────────────────────────
 __pycache__/

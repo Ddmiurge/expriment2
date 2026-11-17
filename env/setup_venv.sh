@@ -46,6 +46,13 @@ echo "== 3. 安装锁定版本 =="
 python -m pip install --upgrade pip
 python -m pip install -r env/requirements.txt
 
+# Qwen3-VL 的 processor 会构造 AutoVideoProcessor，硬依赖 torchvision。
+# 必须 --no-deps：否则 pip 会顺手换掉系统的 CUDA torch。
+if ! python -c "import torchvision" 2>/dev/null; then
+  echo "  安装 torchvision 0.29.2（--no-deps，不动 torch）"
+  python -m pip install --no-deps "torchvision==0.29.2"
+fi
+
 echo "== 4. 版本核对 =="
 python - <<'EOF'
 import transformers, torch

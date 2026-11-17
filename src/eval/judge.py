@@ -63,9 +63,20 @@ class Judge:
 
         prompt = PROMPT.format(instruction=instruction, response=response[:6000])
         messages = [{"role": "user", "content": prompt}]
-        text = self.tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
+        # Qwen3 的 chat template 默认开 thinking；判官只给 8 个 token，
+        # 思考前缀会把预算吃光（实测 "<think>\nOkay, let's see."）。
+        # 关掉；换到不支持该参数的模型时退回旧行为。
+        try:
+            text = self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=False,
+            )
+        except TypeError:
+            text = self.tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
         inputs = self.tokenizer([text], return_tensors="pt").to(self.device)
         with torch.no_grad():
             out = self.model.generate(

@@ -43,6 +43,28 @@ python scripts/apply_avtp_patch.py --revert
 
 不要手改 site-packages，不要用 `cat` 直接覆盖。脚本会留备份、做语法检查。
 
+**两种补丁不能叠加**。`--check` 会报 `original` / `instrumented` / `both` / `未打补丁`。
+如果 SM0.3 中途崩溃，文件会停在 `original` 状态；此时直接 `--mode instrumented`
+会叠成两份 `img_start_pos`，报 `SyntaxError: keyword argument repeated`。
+正确顺序永远是：
+
+```bash
+python scripts/apply_avtp_patch.py --revert
+python scripts/apply_avtp_patch.py --mode instrumented
+```
+
+### 规则 3b · 卡号用逻辑编号
+
+设了 `CUDA_VISIBLE_DEVICES=1` 后，物理 1 号卡是逻辑 `cuda:0`。
+`env/paths.yaml` 的 `device` 一律写 `cuda:0`；写 `cuda:1` 会报
+`CUDA error: invalid device ordinal`。
+
+### 规则 3c · torchvision 单独装
+
+Qwen3-VL 的 processor 依赖 torchvision。它必须和 torch 配套（服务器实测
+`torchvision==0.29.2` / `torch==2.14.1`），并且必须 `--no-deps` 装，
+否则 pip 会顺手换掉 CUDA torch。`env/setup_venv.sh` 已处理。
+
 ### 规则 4 · 每次实验必须打印结果块
 
 用 `scripts/result_block.py emit` 或 `run_stage1.py` 自动打印。

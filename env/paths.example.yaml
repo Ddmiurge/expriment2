@@ -26,6 +26,9 @@ runtime:
   # AVTP 的 patch 需要 eager 吗？不需要——它不用注意力权重。
   # 但 SIEVE-alloc 要抓最后一层注意力，所以统一用 eager，避免两个剪枝器跑在不同实现上。
   attn_implementation: eager
+  # 一律写**逻辑**编号 cuda:0。
+  # 如果启动时设了 CUDA_VISIBLE_DEVICES=1，物理 1 号卡会变成逻辑 cuda:0；
+  # 这时写 cuda:1 会报 invalid device ordinal。
   device: cuda:0
   dtype: bfloat16
   max_new_tokens: 768

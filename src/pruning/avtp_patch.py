@@ -318,6 +318,28 @@ class PatchError(RuntimeError):
     pass
 
 
+# 两种补丁各自的标记。original 模式没有模块级配置，只能靠作者代码里的硬编码行认出来。
+INSTRUMENTED_MARKER = "_PRUNE_CONFIG"
+ORIGINAL_MARKERS = ("reduce_layers = [1 ,19, 22]", "# modify begin")
+
+
+def patch_state(text: str) -> str:
+    """返回 none / instrumented / original / both（叠加损坏）。"""
+    inst = INSTRUMENTED_MARKER in text
+    orig = any(m in text for m in ORIGINAL_MARKERS)
+    if inst and orig:
+        return "both"
+    if inst:
+        return "instrumented"
+    if orig:
+        return "original"
+    return "none"
+
+
+def is_patched(text: str) -> bool:
+    return patch_state(text) != "none"
+
+
 def _replace_once(text: str, old: str, new: str, label: str) -> str:
     n = text.count(old)
     if n != 1:
@@ -328,13 +350,13 @@ def _replace_once(text: str, old: str, new: str, label: str) -> str:
     return text.replace(old, new, 1)
 
 
-def is_patched(text: str) -> bool:
-    return "_PRUNE_CONFIG" in text
-
-
 def patch_instrumented(text: str) -> str:
-    if is_patched(text):
-        raise PatchError("文件已经是注入状态；先 --revert 再重打")
+    state = patch_state(text)
+    if state != "none":
+        raise PatchError(
+            f"文件已经是 {state} 状态；直接叠加会产生重复的 img_start_pos。"
+            "先 --revert，再选一个模式重打。"
+        )
     text = _replace_once(text, ANCHOR_IMPORT_END, ANCHOR_IMPORT_END + PREAMBLE, "import 段末尾")
     text = _replace_once(text, ANCHOR_EMBED, ANCHOR_EMBED + BEGIN_CALL, "rotary_emb 之后")
     text = _replace_once(
@@ -360,8 +382,12 @@ def patch_instrumented(text: str) -> str:
 
 def patch_original(text: str) -> str:
     """作者原版：硬编码层/预算，用来做等价性校验。"""
-    if is_patched(text):
-        raise PatchError("文件已经是注入状态；先 --revert 再重打")
+    state = patch_state(text)
+    if state != "none":
+        raise PatchError(
+            f"文件已经是 {state} 状态；直接叠加会产生重复的 img_start_pos。"
+            "先 --revert，再选一个模式重打。"
+        )
     text = _replace_once(
         text,
         ANCHOR_EMBED,

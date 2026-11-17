@@ -23,9 +23,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.pruning.avtp_patch import (  # noqa: E402
     PatchError,
-    is_patched,
     patch_instrumented,
     patch_original,
+    patch_state,
 )
 
 TARGET_REL = Path("models") / "qwen3_vl" / "modeling_qwen3_vl.py"
@@ -60,21 +60,37 @@ def main() -> int:
     backup = f.with_name(f.name + BACKUP_SUFFIX)
     text = f.read_text(encoding="utf-8")
 
+    state = patch_state(text)
+    labels = {
+        "none": "未打补丁",
+        "instrumented": "已打 instrumented（可配置 + 记录）",
+        "original": "已打 original（只用于 SM0.3 等价性校验）",
+        "both": "两种补丁叠加（文件已损坏，必须 --revert）",
+    }
+
     if a.check:
         print(f"文件：{f}")
-        print(f"状态：{'已打补丁' if is_patched(text) else '未打补丁'}")
+        print(f"状态：{labels[state]}")
         print(f"备份：{'有' if backup.exists() else '无'}")
+        if state == "original":
+            print("提示：要换成 instrumented，先 --revert，再 --mode instrumented。")
         return 0
 
     if a.revert:
         if not backup.exists():
-            raise SystemExit(f"没有备份 {backup}，无法撤销")
+            if state == "none":
+                print("文件本来就没打补丁，无需撤销。")
+                return 0
+            raise SystemExit(f"没有备份 {backup}，无法撤销（状态：{state}）")
         shutil.copy2(backup, f)
         print(f"已从 {backup} 恢复")
         return 0
 
-    if is_patched(text):
-        raise SystemExit("文件已经是注入状态。先 --revert，再选一个模式重打。")
+    if state != "none":
+        raise SystemExit(
+            f"文件已经是 {state} 状态（{labels[state]}）。"
+            "先 --revert，再选一个模式重打；直接叠加会产生重复的 img_start_pos。"
+        )
     if not backup.exists():
         shutil.copy2(f, backup)
         print(f"已备份到 {backup}")
