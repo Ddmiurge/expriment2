@@ -1,0 +1,40 @@
+diff --git a/src/pruning/avtp_patch.py b/src/pruning/avtp_patch.py
+index 5da8ad4..61076a7 100644
+--- a/src/pruning/avtp_patch.py
++++ b/src/pruning/avtp_patch.py
+@@ -182,10 +182,14 @@ def _prune_step(layer_idx, hidden_states, position_ids, text_position_ids,
+         token_scores = [c[1:] for c in full_cos]
+         if method == "avtp":
+             # 与作者代码一致：图级重要性取 vision_start 那一格的相似度
+-            fig_imp = [c[0].item() for c in full_cos]
++            # 必须与作者原版逐位一致：rank_list 保留 bf16 张量，avg/ratio 也在
++            # bf16 上算。一旦 .item() 转成 Python float（float64），舍入差会在
++            # 120 个 token 上放大成半个 token，int() 截断翻转 → 长度差几个
++            # （SM0.3 实测 217 vs 213）。
++            fig_imp = [c[0] for c in full_cos]
+             avg = sum(fig_imp) / len(fig_imp)
+-            alpha = float(_PRUNE_CONFIG["alpha"])
+-            base = float(_PRUNE_CONFIG["base_ratios"][layer_pos])
++            alpha = _PRUNE_CONFIG["alpha"]
++            base = _PRUNE_CONFIG["base_ratios"][layer_pos]
+             ratios = [base + alpha * (avg - x) for x in fig_imp]
+             k_same = None
+         else:
+@@ -199,9 +203,14 @@ def _prune_step(layer_idx, hidden_states, position_ids, text_position_ids,
+ 
+         for idx, (s, e) in enumerate(zip(starts, ends)):
+             n = e - s - 1
+-            k = k_same if method == "equal" else max(
+-                1, int(n * min(1.0, max(0.0, ratios[idx])))
+-            )
++            if method == "equal":
++                k = k_same
++            else:
++                # 与作者一致：先夹到 (0, 1]，再 int() 截断
++                keep_ratio = ratios[idx]
++                keep_ratio = keep_ratio if keep_ratio < 1.0 else 1.0
++                keep_ratio = keep_ratio if keep_ratio > 0.0 else 0.0
++                k = max(1, int(n * keep_ratio))
+             k = min(k, n)
+             order = torch.topk(token_scores[idx], k=k, largest=False).indices
+             keep_mask[s + 1:e][order] = True
