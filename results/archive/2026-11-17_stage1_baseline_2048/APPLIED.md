@@ -1,0 +1,48 @@
+# 2026-11-17 阶段 1 基线（tiny + Changed Question，2048）：归档与处置
+
+**来源**：服务器 `runs/stage1_base/`，代码 `7312209` + 3 个本地修复。
+原始报告：[`2026-11-17_stage1_baseline_tiny_2048_report.md`](2026-11-17_stage1_baseline_tiny_2048_report.md)。
+
+## 读数
+
+| 指标 | 数值 |
+|---|---:|
+| ASR（四档，2/3 成功） | 45.0%（18/40） |
+| 截断 | 12/40 = 30.0% |
+| 未截断样本 ASR | 50.0%（14/28） |
+| chunk_hit | 54.2% |
+| kw_hit | 48.3% |
+| steps_med | 8 |
+| payload_zero | 1.67% |
+
+45% 已进入 20–90% 的可用区间；载荷单元映射健康（1.67%），不需要改 `mask_to_grid`。
+但 30% 截断把 ASR 低估约 5pp，且判官是四档，所以**这不是最终基线**。
+
+## 本轮处置
+
+1. **判官改为论文 A.2.4 的 0–5 H-CoT**，ASR = score ≥3；模型仍 Qwen3-8B。
+   论文 Table 12 的 cross-judge 里 Qwen3 与 GPT-5-nano 的 ASR 接近（61.90 vs 61.07）。
+2. **输出预算升到 3072**；28 条未截断回答复用，只重跑 12 条截断样本。
+3. **tiny 题号冲突修复**：168 个题号只有 110 个全局唯一 id；
+   样本键改为 `category__id` 的 uid，`id` 保留给 tiny 白名单比对。
+4. **游戏参数修复**：答案片段以 `-` 开头时，命令统一 `--flag=value`。
+5. **报数方式**：13 个类目全放算一次；再按类目分两组各算一次
+   （8 个可操作危害类 / 5 个建议类），两组都从同一批 40 条来。
+
+## 待归档的服务器补丁
+
+打包时让服务器带上：
+
+```
+/home/huangqixu01/server_patches/2026-11-17_tiny_id_collision.patch
+/home/huangqixu01/server_patches/2026-11-17_game_cmd_dash_arg.patch
+/home/huangqixu01/server_patches/2026-11-17_midas_nothink.patch
+```
+
+前两个的修复已在上游代码里复现；第三个已在 `src/common/chat.py`。
+原始补丁只用于追溯。
+
+## 下一步
+
+用 0–5 判官 + 3072 重跑 `none`（复用 28 条未截断、重跑 12 条截断），
+看截断率、chunk_hit、ASR；稳定后再跑 `avtp` / `sieve` 50%。

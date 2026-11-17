@@ -37,6 +37,12 @@ class TestResultBlock(unittest.TestCase):
         self.assertIsNone(got.survival_mean())
         self.assertEqual(got.asr(), 1.0)
 
+    def test_scores5(self):
+        b = ResultBlock(exp="t", levels=[0, 1, 3], scores5=[0, 1, 4], kind="asr")
+        got = parse_block(to_text(b))
+        self.assertEqual(got.scores5, [0, 1, 4])
+        self.assertAlmostEqual(got.asr(), 1 / 3)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -111,7 +111,16 @@ def _records_from_obj(
             continue
         sid = str(it.get("id") or it.get("sample_id") or f"{source.stem}_{i:04d}")
         cat = str(it.get("category") or it.get("safety_category") or category or "unknown")
-        yield {"id": sid, "instruction": instruction, "category": cat, "source": str(source)}
+        # tiny 题号只在类目内唯一（168 条只有 110 个全局唯一 id），
+        # 所以另给一个类目前缀的 uid；id 仍保留给 tiny 白名单比对。
+        uid = f"{cat}__{sid}"
+        yield {
+            "id": sid,
+            "uid": uid,
+            "instruction": instruction,
+            "category": cat,
+            "source": str(source),
+        }
 
 
 def _keep(rec: dict, tiny: dict[str, set[str]] | None) -> bool:
@@ -356,18 +365,20 @@ def export_from_records(
         if not kws:
             print(f"跳过 {rec['id']}：抽不出关键词")
             continue
+        uid = rec.get("uid") or f"{rec['category']}__{rec['id']}"
         sample = build_sample(
-            sample_id=rec["id"],
+            sample_id=uid,
             instruction=rec["instruction"],
             category=rec["category"],
             keywords=kws,
             questioner=q,
             midas_dir=midas_dir,
-            out_dir=out_dir / rec["id"],
+            out_dir=out_dir / uid,
             seed=_record_seed(seed, rec["id"]),
             num_images=num_images,
             game_dir=game_dir,
         )
+        sample["orig_id"] = rec["id"]
         sample["source"] = rec["source"]
         samples.append(sample)
         n += 1
@@ -375,6 +386,18 @@ def export_from_records(
 
     write_jsonl(samples, out_jsonl)
     return samples
+
+
+def sample_uid(s: dict) -> str:
+    """样本的唯一标识。旧攻击集只有 id 时，用 类目__id 补出来。"""
+    uid = s.get("uid")
+    if uid:
+        return str(uid)
+    sid = str(s.get("id", ""))
+    cat = str(s.get("category", ""))
+    if "__" in sid or "#" in sid:
+        return sid
+    return f"{cat}__{sid}" if cat else sid
 
 
 def load_samples(path: str | Path, require_mask: bool = True) -> list[dict]:
@@ -386,6 +409,7 @@ def load_samples(path: str | Path, require_mask: bool = True) -> list[dict]:
             s = json.loads(line)
             if require_mask and any(not im.get("mask_path") for im in s.get("images", [])):
                 continue
+            s["uid"] = sample_uid(s)
             out.append(s)
     return out
 

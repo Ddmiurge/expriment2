@@ -32,6 +32,13 @@ class TestStats(unittest.TestCase):
         r = paired_test(a, b, n_boot=2000, seed=2)
         self.assertEqual(r.verdict(), "kill")
 
+    def test_success_fn_scores5(self):
+        r = paired_test([0, 3, 5], [0, 0, 0], n_boot=200, seed=3,
+                        success_fn=lambda x: x >= 3)
+        self.assertAlmostEqual(r.asr_a, 2 / 3)
+        self.assertAlmostEqual(r.asr_b, 0.0)
+        self.assertLess(r.diff, 0)
+
     def test_wilson(self):
         lo, hi = wilson_ci(0, 10)
         self.assertGreaterEqual(lo, 0.0)

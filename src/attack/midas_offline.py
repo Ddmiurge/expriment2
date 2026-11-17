@@ -267,24 +267,32 @@ def prepare_game_dir(midas_dir: Path, asset_dir: Path | None = None, root: Path 
 
 
 def game_command(game: str, out_dir: str, answer: str, seed: int) -> list[str]:
+    # 统一用 --flag=value：答案片段可能以 '-' 开头（long-lasting → -only），
+    # 分开写会被 argparse 当成一个选项。
     base = [
-        sys.executable, str(Path(game)), "--out_dir", out_dir,
-        "--num", "1", "--seed", str(seed),
+        sys.executable,
+        str(Path(game)),
+        f"--out_dir={out_dir}",
+        "--num=1",
+        f"--seed={seed}",
     ]
     name = Path(game).name
     if name == "1_compass.py":
-        base += ["--target_answer", answer, "--max_steps", "2"]
+        base += [f"--target_answer={answer}", "--max_steps=2"]
     elif name == "2_sort.py":
-        base += ["--target_answer", answer]
+        base += [f"--target_answer={answer}"]
     elif name == "3_math_letter.py":
         letter = answer[0].upper() if answer and answer[0].isalpha() else "A"
-        base += ["--target_answer", letter]
+        base += [f"--target_answer={letter}"]
     elif name == "4_captcha_household.py":
-        base += ["--target_sentence", answer]
+        base += [f"--target_sentence={answer}"]
     elif name == "5_odd_letter.py":
-        base += ["--token_len", str(len(answer)), "--answer_token", answer if answer != "A" else "B"]
+        base += [
+            f"--token_len={len(answer)}",
+            f"--answer_token={answer if answer != 'A' else 'B'}",
+        ]
     elif name == "6_jigsaw_puzzle.py":
-        base += ["--text_overlay", answer]
+        base += [f"--text_overlay={answer}"]
     else:
         raise ValueError(f"不认识的游戏：{name}")
     return base

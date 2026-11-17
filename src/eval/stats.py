@@ -61,12 +61,13 @@ def paired_bootstrap(
     levels_b: list[int],
     n_boot: int = 10000,
     seed: int = 0,
+    success_fn=is_success,
 ) -> tuple[float, float, float]:
     """返回 (diff, lo, hi)，diff = ASR_b - ASR_a，按样本重采样。"""
     if len(levels_a) != len(levels_b):
         raise ValueError("两格样本数不同，不能配对")
-    a = np.asarray([is_success(x) for x in levels_a], dtype=np.float64)
-    b = np.asarray([is_success(x) for x in levels_b], dtype=np.float64)
+    a = np.asarray([success_fn(x) for x in levels_a], dtype=np.float64)
+    b = np.asarray([success_fn(x) for x in levels_b], dtype=np.float64)
     rng = np.random.default_rng(seed)
     n = len(a)
     diffs = np.empty(n_boot)
@@ -76,14 +77,20 @@ def paired_bootstrap(
     return float(b.mean() - a.mean()), float(np.quantile(diffs, 0.025)), float(np.quantile(diffs, 0.975))
 
 
-def paired_test(levels_a: list[int], levels_b: list[int], n_boot: int = 10000, seed: int = 0) -> PairedResult:
+def paired_test(
+    levels_a: list[int],
+    levels_b: list[int],
+    n_boot: int = 10000,
+    seed: int = 0,
+    success_fn=is_success,
+) -> PairedResult:
     if len(levels_a) != len(levels_b):
         raise ValueError("两格样本数不同，不能配对")
-    diff, lo, hi = paired_bootstrap(levels_a, levels_b, n_boot=n_boot, seed=seed)
-    b = sum(1 for x, y in zip(levels_a, levels_b) if is_success(x) and not is_success(y))
-    c = sum(1 for x, y in zip(levels_a, levels_b) if not is_success(x) and is_success(y))
-    a_asr = sum(is_success(x) for x in levels_a) / len(levels_a)
-    b_asr = sum(is_success(x) for x in levels_b) / len(levels_b)
+    diff, lo, hi = paired_bootstrap(levels_a, levels_b, n_boot=n_boot, seed=seed, success_fn=success_fn)
+    b = sum(1 for x, y in zip(levels_a, levels_b) if success_fn(x) and not success_fn(y))
+    c = sum(1 for x, y in zip(levels_a, levels_b) if not success_fn(x) and success_fn(y))
+    a_asr = sum(success_fn(x) for x in levels_a) / len(levels_a)
+    b_asr = sum(success_fn(x) for x in levels_b) / len(levels_b)
     return PairedResult(
         n=len(levels_a),
         asr_a=a_asr,

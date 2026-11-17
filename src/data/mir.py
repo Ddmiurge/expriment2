@@ -31,8 +31,10 @@ def _iter_json(path: Path) -> Iterator[dict]:
         images = [path.parent / p for p in it.get("images", [])]
         if not images:
             continue
+        sid = str(it.get("id") or f"{path.stem}_{i:04d}")
         yield {
-            "id": str(it.get("id") or f"{path.stem}_{i:04d}"),
+            "id": sid,
+            "uid": f"{category}__{sid}",
             "category": category,
             "instruction": it.get("original_question") or it.get("revised_prompt") or "",
             "prompt": it.get("revised_prompt") or it.get("original_question") or "",

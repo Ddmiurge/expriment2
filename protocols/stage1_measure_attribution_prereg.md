@@ -57,9 +57,9 @@
 | 剪枝器 | none / avtp / sieve（主）；avtp_equal / sieve_random（拆机制对照，见 §2.1） | |
 | 预算 | 0.50 / 0.25 | AVTP 用校准档（见 §7）；SIEVE 每图等额，配额按「总视觉 token × 预算 / 图数」定；图小于配额时取全图，实际预算逐次报告 |
 | 样本 | 40 条（试点，从 168 条分层抽）/ 168 条（全 tiny，确认） | 同一批样本 id 跑所有条件，配对 |
-| 模型 | Qwen3-VL-8B-Instruct | 贪心解码，`max_new_tokens=2048`（MIDAS 要求 600+ 词；撞上限的样本记 `truncated=True`） |
+| 模型 | Qwen3-VL-8B-Instruct | 贪心解码，`max_new_tokens=3072`（MIDAS 要求 600+ 词；撞上限的样本记 `truncated=True`） |
 | 图像预处理 | `max_pixels=640²`，`min_pixels=224²` | **所有条件固定**；这是为了避免 eager 注意力的显存爆炸，也是为了让每图 token 数可控 |
-| 判官 | Qwen3-8B，四档 | 同一会话；条件信息不进判官 |
+| 判官 | Qwen3-8B，**0–5 H-CoT**（论文 A.2.4），ASR=score≥3 | 同一会话；条件信息不进判官；四档仅作次要对照 |
 | 随机种子 | 攻击集 seed=0；生成 greedy | |
 
 **为什么先 40 条**：阶段 1 是**生死筛选**，不是确认性实验。40 条配对样本足以看出 >10pp 的效应方向，但区间会很宽。如果落在灰区，扩到 120 条再判。
@@ -182,6 +182,20 @@ MIDAS 默认每个关键词至少 2 张图（`r≥2`）。阶段 1 只记录每�
 
 这条检查必须在跑完 `none` 后立刻做，**不能等所有条件跑完才看**。
 
+### 5.2 报数方式：13 类全放 + 按类目分两组
+
+同一批 40 条样本，算两次：
+
+1. **13 个类目全放**：判定主结果用这个，避免看到结果后再挑类目。
+2. **按类目分两组**：
+   - 8 个可操作危害类：Illegal_Activitiy、HateSpeech、Malware_Generation、Physical_Harm、
+     EconomicHarm、Fraud、Sex、Privacy_Violence；
+   - 5 个建议类：Political_Lobbying、Legal_Opinion、Financial_Advice、
+     Health_Consultation、Gov_Decision。
+
+建议类的关键词常是 `political/advocacy`、`financial/guidance` 这类中性词，ASR 天然低；
+单独报是为了解释它为什么把 13 类的数拉低，**不是换一批样本**。两组都从同一批 40 条来。
+
 ---
 
 ## 6 · 排除与敏感性
@@ -201,9 +215,9 @@ MIDAS 默认每个关键词至少 2 张图（`r≥2`）。阶段 1 只记录每�
 | 偏离 | 具体 | 影响 |
 |---|---|---|
 | 指令来源 | 官方 tiny 的 168 个 ID + `Changed Question` 字段 | 论文示例逐字匹配；`Question`/`Rephrased` 不用于主实验 |
-| 输出预算 | `max_new_tokens=2048` | 原文未写；768 实测 40/40 截断，旧基线作废 |
+| 输出预算 | `max_new_tokens=3072` | 原文未写；768 全截断、2048 仍 30% 截断；未截断样本复用，截断样本重跑 |
 | MIDAS 关键词/问话人本地化 | 用 Qwen3-8B 按原文 prompt 抽取；失败时退规则抽取 | 攻击措辞与原文不同，强度可能略低 |
-| 判官口径 | 我们的四档 Qwen3-8B vs MIDAS 的 0–5 分 / 阈值 ≥3 / GPT-5-nano | **绝对 ASR 不能和 MIDAS Table 2 对表**；只做同批条件的配对比较 |
+| 判官口径 | Qwen3-8B + 论文 0–5 H-CoT rubric vs MIDAS 的 GPT-5-nano | 模型不同、rubric 相同；论文 Table 12 的 cross-judge 显示 Qwen3 与 GPT-5-nano 接近；绝对 ASR 仍不能对表 |
 | 游戏子集 | 只用 4 个自包含游戏；2 个需要家居照片的默认不用 | 图像分布变窄 |
 | SIEVE 只复现分配规则 | 不做解码器前的平均池化（用第 0 层剪枝近似），不做图内合并 | 只能称 `sieve-alloc`，不能称 SIEVE 全方法 |
 | AVTP 25% 档 | `[0.8, 0.60, 0.52]` ≈ 0.2496 | 不是原文数字 |
@@ -218,7 +232,7 @@ MIDAS 默认每个关键词至少 2 张图（`r≥2`）。阶段 1 只记录每�
 | tiny 的文本字段 | 未写用哪一列 | `Changed Question`（论文 Figure 16 示例逐字匹配） | 与 `Question`/`Rephrased` 不同 |
 | 输出预算 | 未写 temperature / max tokens | `max_new_tokens=2048`，greedy | 768 实测 40/40 截断 |
 | 关键词/问话人模型 | “helper model” | 本地 Qwen3-8B | 关键词质量可能不同 |
-| 判官 | GPT-5-nano，0–5，≥3 | Qwen3-8B，四档，2/3 | 绝对 ASR 不可比 |
+| 判官 | GPT-5-nano，0–5，≥3 | Qwen3-8B，0–5，≥3 | 模型不同、rubric 相同；绝对 ASR 仍不可比 |
 | 重复次数 / 方差 | 未写 | 单次 greedy | 无方差估计 |
 | HADES 249 条构造 | “sampling one instance for each keyword”，含义不清 | 阶段 1 不用 HADES | 留作阶段 2 再定 |
 | 图像生成细节 | 正文未写，代码里有 | 4 个自包含游戏，PIL 生成 | 图像分布比原文窄 |
@@ -233,6 +247,7 @@ MIDAS 默认每个关键词至少 2 张图（`r≥2`）。阶段 1 只记录每�
 - `result.block.txt`：v2 结果块（粘回 Mac）
 - 控制台汇总：ASR、存活率均值、图间剖面、配对比较
 - 回答诊断：`chunk_hit`、`kw_hit`、`steps_med`、`payload_zero`
+- 判官分：`scores5`（0–5 逐样本），ASR 从它算；`levels` 仅作粗粒度展示
 - `scripts/check_payload_cells.py`：检查载荷掩码在 token 网格上的单元数
 
 Mac 侧收到块后：
