@@ -1,24 +1,27 @@
-# TASKS · 当前：完成 40 条归因，再决定扩 168（2026-11-18）
+# TASKS · 本轮：MIDAS 4096 重跑 + MIR none/AVTP（2026-11-18）
 
-> 40 条试点已出主结果：基线 **60.0%**、AVTP 50% **27.5%**，配对 **−32.5pp**、
-> CI [−50,−15]、McNemar **p=0.0023**。按协议，关卡 1 的「剪枝杀伤成立」已经过了。
+> **本轮只跑 4 个格**：MIDAS `none`/`avtp` 4096；MIR `none`/`avtp` 4096。
+> 判官统一 0–5 H-CoT；同一数据集内部配对；两个数据集不混在一起比。
 >
-> **现在不扩样本**。先把归因做完：SIEVE 50 → `avtp_equal` 50 → `sieve_random` 50
-> → 截断/复读敏感性。三项归因齐了、协议冻结后，再把 `none` / `avtp` / `sieve`
-> 扩到 **168**（官方 tiny 全量；不扩 120）。
+> `eq_attn`（旧跑格 id `sieve`）和 `eq_random`（旧 `sieve_random`）**不是 SIEVE**，
+> 已归档为探索性对照，本轮不跑。命名口径见 `protocols/condition_naming.md`。
+>
+> 4096 的依据：论文 Table 6 报 MIDAS 平均推理长度 **3195 token**；3072 低于平均值，
+> 截断是预期内的。4096 是“高于原文平均长度”的预算，不是原文明确设置。
 
 ## 0.0 · 当前进度
 
 | 条件 | 状态 |
 |---|---|
-| `none` 基线 | ✅ ASR 60.0%（24/40） |
-| `avtp` 0.5 | ✅ ASR 27.5%（11/40） |
-| `sieve` 0.5 | 🔄 GPU 3 运行中 |
-| `avtp_equal` 0.5 | ⬜ 下一步，用 GPU 4 |
-| `sieve_random` 0.5 | ⬜ |
-| 截断/复读敏感性 | ⬜ `scripts/sensitivity_truncation.py` |
-| 25% 预算档 | ⬜ 归因完成后 |
-| 168 全量 | ⬜ 协议冻结后 |
+| MIDAS `none` 3072 | ✅ ASR 60.0%（24/40） |
+| MIDAS `avtp` 3072 | ✅ ASR 27.5%（11/40） |
+| `eq_attn` / `eq_random` | 🗄 非 SIEVE，归档，不作主结果 |
+| **MIDAS `none` 4096** | ⬜ 本轮 |
+| **MIDAS `avtp` 4096** | ⬜ 本轮 |
+| **MIR `none` 4096** | ⬜ 本轮 |
+| **MIR `avtp` 4096** | ⬜ 本轮 |
+| 168 全量 | ⬜ 等本轮结果 |
+| 25% 预算档 | ⬜ 等本轮结果 |
 
 
 ---
@@ -181,7 +184,59 @@ python scripts/run_stage1.py --attack midas \
 
 ---
 
-## 4 · 跑归因（关卡 1 之后）
+## 3.5 · 本轮 4 个格（2026-11-18）
+
+| # | 数据 | 条件 | 样本 | 预算 |
+|---|---|---|---:|---:|
+| 1 | MIDAS | `none` | 40（同现有 uid） | 4096 |
+| 2 | MIDAS | `avtp` 0.5 | 40（同现有 uid） | 4096 |
+| 3 | MIR-SafetyBench | `none` | 40（按类目分层） | 4096 |
+| 4 | MIR-SafetyBench | `avtp` 0.5 | 40（同一批） | 4096 |
+
+### MIDAS：全量 4096 重跑（不复用 3072）
+
+```bash
+# 基线
+CUDA_VISIBLE_DEVICES=3 python scripts/run_stage1.py --attack midas \
+    --samples data/midas/attack_set.jsonl --pruner none \
+    --out runs/stage1_base_4096 --limit 40 \
+    --max-new-tokens 4096 --judge-mode hcot
+
+# AVTP
+CUDA_VISIBLE_DEVICES=4 python scripts/run_stage1.py --attack midas \
+    --samples data/midas/attack_set.jsonl --pruner avtp --budget 0.5 \
+    --out runs/stage1_avtp50_4096 --limit 40 \
+    --max-new-tokens 4096 --judge-mode hcot \
+    --compare runs/stage1_base_4096/results.jsonl
+```
+
+### MIR：40 条，按类目分层
+
+```bash
+# 基线
+CUDA_VISIBLE_DEVICES=3 python scripts/run_stage1.py --attack mir \
+    --samples /path/to/MIR-SafetyBench --pruner none \
+    --out runs/mir_base_4096 --limit 40 \
+    --max-new-tokens 4096 --judge-mode hcot
+
+# AVTP
+CUDA_VISIBLE_DEVICES=4 python scripts/run_stage1.py --attack mir \
+    --samples /path/to/MIR-SafetyBench --pruner avtp --budget 0.5 \
+    --out runs/mir_avtp50_4096 --limit 40 \
+    --max-new-tokens 4096 --judge-mode hcot \
+    --compare runs/mir_base_4096/results.jsonl
+```
+
+### 读法
+
+- MIDAS 和 MIR **各自**做 `none` → `avtp` 配对；不要跨数据集合并。
+- MIR 没有载荷掩码：`survival`、`chunk_hit`、`kw_hit` 都是 `n/a`；只看 ASR、截断、`steps_med`。
+- 每个数据集先过基线闸：`none` ASR 在 20–90% 才继续。
+- `--compare` 现在按 `--judge-mode` 选 0–5 或四档；0–5 下 ASR=score≥3。
+
+---
+
+## 4 · 后续：归因（等本轮结果）
 
 ### 4.1 SIEVE 50%（已在 GPU 3 运行）
 

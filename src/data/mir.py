@@ -43,19 +43,41 @@ def _iter_json(path: Path) -> Iterator[dict]:
         }
 
 
-def load_mir_samples(root: str, limit: int | None = None, require_files: bool = True) -> list[dict]:
-    out: list[dict] = []
+def load_mir_samples(
+    root: str,
+    limit: int | None = None,
+    require_files: bool = True,
+    stratify: bool = True,
+) -> list[dict]:
+    all_samples: list[dict] = []
     for s in _iter_json(Path(root)):
         if not s["prompt"] or not s["instruction"]:
             continue
         if require_files and any(not Path(im["path"]).exists() for im in s["images"]):
             continue
-        out.append(s)
-        if limit is not None and len(out) >= limit:
-            break
-    if not out:
+        all_samples.append(s)
+    if not all_samples:
         raise RuntimeError(
             f"{root} 里没有读到可用的 MIR 样本。"
             "先跑 extract_data.py 解压；或检查 JSON 里的 images 路径是否相对于 JSON 所在目录。"
         )
-    return out
+    if limit is None or len(all_samples) <= limit:
+        return all_samples
+    if not stratify:
+        return all_samples[:limit]
+
+    # 按类目等额抽样；类目名来自 *_final.json 所在目录。
+    groups: dict[str, list[dict]] = {}
+    for s in all_samples:
+        groups.setdefault(s["category"], []).append(s)
+    cats = sorted(groups)
+    base, extra = divmod(limit, len(cats))
+    picked: list[dict] = []
+    leftovers: list[dict] = []
+    for i, cat in enumerate(cats):
+        m = base + (1 if i < extra else 0)
+        picked.extend(groups[cat][:m])
+        leftovers.extend(groups[cat][m:])
+    if len(picked) < limit:
+        picked.extend(leftovers[: limit - len(picked)])
+    return picked[:limit]

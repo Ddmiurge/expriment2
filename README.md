@@ -247,9 +247,13 @@ multi-image-code/
   配对 **−32.5pp**、95% CI [−50,−15]、McNemar **p=0.0023** → 关卡 1「剪枝杀伤成立」。
   载荷存活率 1.00→0.193，关键词复原率 0.492→0.292。报告归档在
   `results/archive/2026-11-18_stage1_avtp50/`。
+- **2026-11-18 归因报告**：四个剪枝条件相对基线都下降；但 `sieve`/`sieve_random`
+  是**我们自己写的等额配额实现，不是 SIEVE**。已归档到
+  `results/archive/2026-11-18_stage1_attribution/`，并加 `ERRATUM.md`；
+  命名口径见 `protocols/condition_naming.md`。旧结果只作探索性对照，不作 SIEVE 引用。
 - 远端：`git@github.com:Ddmiurge/expriment2.git`，分支 `main`。
-- **下一步**：先做归因，不扩样本。顺序是 SIEVE 50（运行中）→ `avtp_equal` 50 →
-  `sieve_random` 50 → 截断/复读敏感性；齐了之后再把 `none`/`avtp`/`sieve` 扩到
-  **168**（官方 tiny 全量，不扩 120）。详见 `TASKS.md`。
+- **下一步（本轮 4 个格）**：MIDAS `none`/`avtp` 4096 重跑；MIR-SafetyBench
+  `none`/`avtp` 4096（40 条，按类目分层）。两个数据集各自配对，不跨数据集合并。
+  4096 的依据是论文 Table 6 的 MIDAS 平均推理长度 3195 token。详见 `TASKS.md`。
 
 服务器只读（能 pull、不能 push）；代码改动一律在 Mac 上做、push、服务器再 pull。
