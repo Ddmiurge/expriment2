@@ -243,8 +243,13 @@ multi-image-code/
   `results/archive/2026-11-17_stage1_baseline/` 与 `..._2048/`。
   处置：判官改为 **论文 0–5 H-CoT**（ASR≥3）；预算 **3072**；未截断的 28 条复用、
   只重跑 12 条截断样本；样本键改用 `category__id` 的 uid。
+- **2026-11-18**：基线 **60.0%**（24/40），AVTP 50% **27.5%**（11/40），
+  配对 **−32.5pp**、95% CI [−50,−15]、McNemar **p=0.0023** → 关卡 1「剪枝杀伤成立」。
+  载荷存活率 1.00→0.193，关键词复原率 0.492→0.292。报告归档在
+  `results/archive/2026-11-18_stage1_avtp50/`。
 - 远端：`git@github.com:Ddmiurge/expriment2.git`，分支 `main`。
-- **下一步**：用 0–5 判官 + 3072 重跑 `none`（复用 28 条未截断、重跑 12 条截断），
-  先看截断率、chunk hit、ASR（见 `TASKS.md`）。关卡 1 之前不要跑 25% 档与拆机制对照。
+- **下一步**：先做归因，不扩样本。顺序是 SIEVE 50（运行中）→ `avtp_equal` 50 →
+  `sieve_random` 50 → 截断/复读敏感性；齐了之后再把 `none`/`avtp`/`sieve` 扩到
+  **168**（官方 tiny 全量，不扩 120）。详见 `TASKS.md`。
 
 服务器只读（能 pull、不能 push）；代码改动一律在 Mac 上做、push、服务器再 pull。

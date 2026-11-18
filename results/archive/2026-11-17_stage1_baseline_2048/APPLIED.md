@@ -29,18 +29,11 @@
 5. **报数方式**：13 个类目全放算一次；再按类目分两组各算一次
    （8 个可操作危害类 / 5 个建议类），两组都从同一批 40 条来。
 
-## 待归档的服务器补丁
+## 服务器补丁（可选追溯）
 
-打包时让服务器带上：
-
-```
-/home/huangqixu01/server_patches/2026-11-17_tiny_id_collision.patch
-/home/huangqixu01/server_patches/2026-11-17_game_cmd_dash_arg.patch
-/home/huangqixu01/server_patches/2026-11-17_midas_nothink.patch
-```
-
-前两个的修复已在上游代码里复现；第三个已在 `src/common/chat.py`。
-原始补丁只用于追溯。
+三个修复都已在上游代码 `c6183d2` 里（uid、`--flag=value`、no-think helper），
+补丁文件不是运行必需。若打包方便，可带回
+`server_patches/` 下的三个 `.patch` 作审计记录；不带也不影响实验。
 
 ## 下一步
 

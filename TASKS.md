@@ -1,8 +1,25 @@
-# TASKS · 下一轮：建攻击集 + 阶段 1 基线（阶段 0 已通过 2026-11-17）
+# TASKS · 当前：完成 40 条归因，再决定扩 168（2026-11-18）
 
-> 阶段 0 六项已在服务器全过。本轮开始产出第一批研究数字，但**只到关卡 1 为止**：
-> 先跑 `none` 基线，确认攻击本身有下降空间，再跑 `avtp` / `sieve` 的 50% 档。
-> 不要在关卡 1 出结果前把 9 个条件全跑完。
+> 40 条试点已出主结果：基线 **60.0%**、AVTP 50% **27.5%**，配对 **−32.5pp**、
+> CI [−50,−15]、McNemar **p=0.0023**。按协议，关卡 1 的「剪枝杀伤成立」已经过了。
+>
+> **现在不扩样本**。先把归因做完：SIEVE 50 → `avtp_equal` 50 → `sieve_random` 50
+> → 截断/复读敏感性。三项归因齐了、协议冻结后，再把 `none` / `avtp` / `sieve`
+> 扩到 **168**（官方 tiny 全量；不扩 120）。
+
+## 0.0 · 当前进度
+
+| 条件 | 状态 |
+|---|---|
+| `none` 基线 | ✅ ASR 60.0%（24/40） |
+| `avtp` 0.5 | ✅ ASR 27.5%（11/40） |
+| `sieve` 0.5 | 🔄 GPU 3 运行中 |
+| `avtp_equal` 0.5 | ⬜ 下一步，用 GPU 4 |
+| `sieve_random` 0.5 | ⬜ |
+| 截断/复读敏感性 | ⬜ `scripts/sensitivity_truncation.py` |
+| 25% 预算档 | ⬜ 归因完成后 |
+| 168 全量 | ⬜ 协议冻结后 |
+
 
 ---
 
@@ -164,24 +181,58 @@ python scripts/run_stage1.py --attack midas \
 
 ---
 
-## 4 · 跑主条件（关卡 1 的后半）
+## 4 · 跑归因（关卡 1 之后）
+
+### 4.1 SIEVE 50%（已在 GPU 3 运行）
 
 ```bash
-python scripts/run_stage1.py --attack midas \
-    --samples data/midas/attack_set.jsonl --pruner avtp --budget 0.5 \
-    --out runs/stage1_avtp50 --limit 40 --max-new-tokens 3072 --judge-mode hcot \
-    --compare runs/stage1_base_3072/results.jsonl
-
-python scripts/run_stage1.py --attack midas \
+CUDA_VISIBLE_DEVICES=3 python scripts/run_stage1.py --attack midas \
     --samples data/midas/attack_set.jsonl --pruner sieve --budget 0.5 \
     --out runs/stage1_sieve50 --limit 40 --max-new-tokens 3072 --judge-mode hcot \
     --compare runs/stage1_base_3072/results.jsonl
 ```
 
-跑完把三个结果块（`runs/*/result.block.txt`）粘回 Mac。**先看关卡 1 判定**：
-跌幅 >10pp 且区间上界 <0 → 杀成立；<5pp 或跨 0 → 不杀；5–10 → 灰区扩容。
+### 4.2 AVTP 同打分、换等额分配（GPU 4）
 
-**不要**在这一步之前跑 25% 档和拆机制对照。
+```bash
+CUDA_VISIBLE_DEVICES=4 python scripts/run_stage1.py --attack midas \
+    --samples data/midas/attack_set.jsonl --pruner avtp_equal --budget 0.5 \
+    --out runs/stage1_avtp_equal50 --limit 40 --max-new-tokens 3072 --judge-mode hcot \
+    --compare runs/stage1_base_3072/results.jsonl
+```
+
+### 4.3 SIEVE 同等额、换随机打分
+
+```bash
+CUDA_VISIBLE_DEVICES=4 python scripts/run_stage1.py --attack midas \
+    --samples data/midas/attack_set.jsonl --pruner sieve_random --budget 0.5 \
+    --out runs/stage1_sieve_random50 --limit 40 --max-new-tokens 3072 --judge-mode hcot \
+    --compare runs/stage1_base_3072/results.jsonl
+```
+
+### 4.4 截断/复读敏感性（不占 GPU）
+
+```bash
+python scripts/sensitivity_truncation.py \
+    --baseline runs/stage1_base_3072/results.jsonl \
+    --condition runs/stage1_avtp50/results.jsonl
+
+# 同样对 sieve50 / avtp_equal50 / sieve_random50 各跑一次
+```
+
+看四个子集：全部配对、两边都未截断、两边都无复读、两者都满足。
+如果干净子集里效应仍然大，结论稳；如果明显缩水，机制要写成「载荷删除 + 生成退化」两条路径。
+
+### 4.5 什么时候扩 168
+
+只有以上四项都齐了、协议冻结后才扩。扩的是三个主条件：
+
+- `none`、`avtp` 0.5、`sieve` 0.5；
+- 用官方 tiny 全量 168，不用 120；
+- 两个拆机制对照留在 40（最多 80），不扩 168；
+- 25% 档在归因完成后单独跑。
+
+
 
 ---
 
@@ -201,17 +252,22 @@ python scripts/run_stage1.py --attack midas \
 
 ---
 
-## 6 · 打包时让服务器带上
+## 6 · 服务器补丁（可选追溯，不是运行必需）
 
-这三个补丁文件在服务器 `server_patches/` 下，打包时一并带回 Mac 归档：
+三个修复都已在上游代码 `c6183d2` 里：
+
+- tiny 题号冲突 → `category__id` 的 uid；
+- 游戏参数 `-only` → `--flag=value`；
+- 关键词抽取 thinking → `src/common/chat.py`。
+
+服务器 `server_patches/` 下的 `.patch` 只是只读侧的原始改动记录。**不带回来不影响实验**；
+如果打包时顺手，可以带回归档：
 
 ```
 /home/huangqixu01/server_patches/2026-11-17_tiny_id_collision.patch
 /home/huangqixu01/server_patches/2026-11-17_game_cmd_dash_arg.patch
 /home/huangqixu01/server_patches/2026-11-17_midas_nothink.patch
 ```
-
-前两个的修复已在上游代码里复现；第三个已在 `src/common/chat.py`。原始补丁只用于归档追溯。
 
 ---
 
