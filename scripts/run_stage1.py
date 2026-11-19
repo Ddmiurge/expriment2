@@ -167,7 +167,7 @@ def build_reused_rec(
 
 def main() -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("--attack", choices=["midas", "mir"], default="midas")
+    p.add_argument("--attack", choices=["midas", "mir", "dmn"], default="midas")
     p.add_argument("--samples", default=str(Path("data") / "midas" / "attack_set.jsonl"))
     p.add_argument(
         "--pruner",
@@ -210,16 +210,29 @@ def main() -> int:
         samples = load_samples(a.samples)
         if a.limit:
             samples = samples[: a.limit]
-    else:
+    elif a.attack == "mir":
         # 在 loader 里做分层抽样；不要先取全部再切前 N，那会退回文件顺序
         samples = load_mir_samples(a.samples, limit=a.limit, stratify=True)
+    else:
+        # DMN：没有载荷掩码，images[].mask_path=None
+        samples = load_samples(a.samples, require_mask=False)
+        if a.limit:
+            samples = samples[: a.limit]
     if not samples:
         raise SystemExit(f"{a.samples} 里没有可用样本")
 
     if a.dry_run:
         bad = 0
         for s in samples:
-            issues = validate_sample(s) if a.attack == "midas" else []
+            if a.attack == "midas":
+                issues = validate_sample(s)
+            elif a.attack == "dmn":
+                issues = [
+                    f"缺图 {im['path']}" for im in s.get("images", [])
+                    if not Path(im["path"]).exists()
+                ]
+            else:
+                issues = []
             if issues:
                 bad += 1
                 print(f"✗ {s['id']}: {issues}")

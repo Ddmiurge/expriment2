@@ -333,3 +333,57 @@ python scripts/sensitivity_truncation.py \
 - 不要在服务器上写 `src/` 或 `scripts/`；要改就打印补丁交回 Mac。
 - 不要用 OpenAI API。
 - 不要为了让 SM0.5 通过而改判官 rubric。
+
+---
+
+## 8 · DMN 复现（进行中，先 FLUX 后 SCJ）
+
+> 代码已实现，未跑 GPU。先 D0 单条 smoke，重点看：辅助 LLM 拒答、JSON、T2I token 长度、图片数/显存、模型能否读 number chain。
+> 偏离记录见 `protocols/reproduction_deviation_log.md`。
+
+### 8.1 D0：1 条 smoke
+
+```bash
+# 生成 1 条 DMN 样本（辅助 LLM 与 FLUX 分卡）
+CUDA_VISIBLE_DEVICES=3,4 python scripts/build_dmn_set.py \
+    --input data/midas/questions_tiny.jsonl \
+    --out data/dmn/d0.jsonl --out-dir data/dmn/images_d0 \
+    --limit 1 --t2i-backend flux \
+    --aux-device cuda:0 --t2i-device cuda:1
+```
+
+看三样：
+
+1. **T5/CLIP token 数**：脚本最后会打印 `max/median`；T5 >512 会警告；
+2. **图片数**：应为 `指令词数 + 5 证据 + 5 number chain`；
+3. **占位图**：`meta.evidence_meta[].placeholder`，有就说明 T2I 失败。
+
+```bash
+# 受害者跑 1 条
+python scripts/run_stage1.py --attack dmn \
+    --samples data/dmn/d0.jsonl --pruner none \
+    --out runs/dmn_d0 --limit 1 \
+    --max-new-tokens 3072 --judge-mode hcot
+```
+
+看回答里有没有 **number chain 的数字**、有没有读红词。读不到 → 分辨率问题（先记，再决定升 `max_pixels`）。
+
+### 8.2 D1：10 条 pilot
+
+```bash
+CUDA_VISIBLE_DEVICES=3,4 python scripts/build_dmn_set.py \
+    --input data/midas/questions_tiny.jsonl \
+    --out data/dmn/attack_set_10.jsonl --out-dir data/dmn/images_10 \
+    --limit 10 --t2i-backend flux \
+    --aux-device cuda:0 --t2i-device cuda:1
+
+python scripts/run_stage1.py --attack dmn \
+    --samples data/dmn/attack_set_10.jsonl --pruner none \
+    --out runs/dmn_10_none --limit 10 --max-new-tokens 3072 --judge-mode hcot
+```
+
+关卡：ASR <20% 就停，记录为“DMN 复现对 Qwen3-VL-8B 太弱”，不要铺 40 条。
+
+### 8.3 D2/D3：40 条 none + AVTP
+
+只有 D1 通过（ASR ≥20%）才做。同 MIDAS 的协议：40 条、3072、0–5 H-CoT、配对。

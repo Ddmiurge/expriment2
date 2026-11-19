@@ -21,3 +21,5 @@ pillow>=10.0
 pyyaml>=6.0
 tqdm>=4.66
 datasets>=3.0
+diffusers>=0.30  # DMN 的本地 T2I（FLUX/SDXL）
+sentencepiece>=0.2  # FLUX 的 T5 tokenizer

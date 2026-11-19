@@ -7,6 +7,10 @@
 models:
   qwen3vl_8b:       /path/to/models/Qwen3-VL-8B-Instruct
   judge_qwen3_8b:   /path/to/models/Qwen3-8B
+  # DMN 的 T2I（原文是 GPT Image 1，属已确认偏离）
+  # 主用 FLUX.1-schnell（T5 512 token）；SDXL 仅备选（CLIP 77 token 会截断）
+  flux:             /path/to/models/FLUX.1-schnell
+  sdxl:             /path/to/models/stable-diffusion-xl-base-1.0
 
 data:
   # MIDAS 只放我们自己的指令集（仓库存里没有 dateset/*.json）
