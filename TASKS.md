@@ -387,3 +387,59 @@ python scripts/run_stage1.py --attack dmn \
 ### 8.3 D2/D3：40 条 none + AVTP
 
 只有 D1 通过（ASR ≥20%）才做。同 MIDAS 的协议：40 条、3072、0–5 H-CoT、配对。
+
+### 8.4 number chain `Frame N` 诊断（1 条，不重生成图）
+
+主 40 条里数字命中 85.5%，但链顺序 0/40：模型按图片物理顺序读，不按“第 Y 帧”跳转。
+先只给 chain 帧加 `Frame N` 角标（N = 整条序列位置），其它图和 prompt 不动，跑 1 条判断是版式问题还是模型能力问题。
+
+```bash
+# 从已有 40 条样本重建 1 条带角标的样本（不调用辅助 LLM / FLUX）
+python scripts/dmn_chain_diagnostic.py \
+    --input data/dmn/attack_set_40.jsonl \
+    --out data/dmn/attack_set_chain_labels_1.jsonl \
+    --out-dir data/dmn/images_chain_labels --limit 1
+
+# 受害者跑 1 条，判官用 H-CoT
+python scripts/run_stage1.py --attack dmn \
+    --samples data/dmn/attack_set_chain_labels_1.jsonl --pruner none \
+    --out runs/dmn_chain_diag_1 --limit 1 \
+    --max-new-tokens 3072 --judge-mode hcot
+```
+
+判读：
+
+- 回答里的数字顺序 = `meta.chain.jump` → 角标有效，版式是主因；
+- 仍按物理顺序 → 模型不会按“第 Y 帧”跳转；记录为 DMN 在该模型上的能力限制，不再在 number chain 上投入；
+- 角标只作为**诊断**，不混入主 40 条；若要采用，必须 none/AVTP 全条件重跑并记偏离。
+
+### 8.5 AVTP 20% / 25% 预算（dose-response 第三点）
+
+用**同一份未加角标的 40 条**，和现有 none / AVTP 0.5 直接配对；不要与加角标样本混用。
+
+优先级：**先跑 20%**（AVTP 原文档位，`0.8×0.5×0.5`，更有论文依据）；
+25% 是我们校准的中间点（`0.8×0.60×0.52`），只在需要定位阈值时加跑。
+两张卡空闲时可以并行，互不影响。
+
+```bash
+# 20%：原文档位，优先
+python scripts/run_stage1.py --attack dmn \
+    --samples data/dmn/attack_set_40.jsonl --pruner avtp --budget 0.20 \
+    --out runs/dmn_40_avtp20 --limit 40 \
+    --max-new-tokens 3072 --judge-mode hcot \
+    --compare runs/dmn_40_none/results.jsonl
+
+# 25%：校准档，可选/并行
+python scripts/run_stage1.py --attack dmn \
+    --samples data/dmn/attack_set_40.jsonl --pruner avtp --budget 0.25 \
+    --out runs/dmn_40_avtp25 --limit 40 \
+    --max-new-tokens 3072 --judge-mode hcot \
+    --compare runs/dmn_40_none/results.jsonl
+```
+
+判读：
+
+- `keepfrac` 应约 0.20 / 0.25；若仍接近 0.5，先查 schedule；
+- 20% 下 ASR 若仍 ≈85% → 文本证据/任务结构足以支撑，视觉 token 进一步砍也不动；
+- 若明显下降 → 存在阈值效应，需区分是红词读不到还是证据图被剪坏（看 chunk/keyword hit 和回答）；
+- 20% 是原文档位，25% 是我们校准的中间点；两者都不替代 0.5 主结果。

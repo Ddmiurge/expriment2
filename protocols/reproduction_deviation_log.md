@@ -82,3 +82,19 @@
 **D0/D1 必查**：`build_dmn_set.py` 已打印每个证据 prompt 的 T5/CLIP token 数；
 若 T5 max >512，按本日志首条处理。
 
+
+---
+
+## 2026-11-19 · DMN · number chain `Frame N` 角标（诊断）
+
+**原文**：number chain 帧只有数字和“next number from the Y-th frame”，没有显式帧号。
+
+**我们**：新增 `--chain-labels` / `scripts/dmn_chain_diagnostic.py`，在 chain 帧左上角写 `Frame N`（N = 整条序列位置）。默认关闭，主 40 条不受影响。
+
+**原因**：主 40 条数字命中 85.5%，链顺序 0/40；需要区分“版式没给位置”与“模型不会跳转”。
+
+**影响**：
+
+- 只作 1 条诊断，不进入主结果；
+- 若诊断有效并决定采用，必须 none / AVTP 0.5 / 0.25 全条件重跑，并在论文中明确这是版式偏离；
+- 角标不是原文方法的一部分，不能写成“完整复现 DMN”。

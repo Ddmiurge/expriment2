@@ -106,6 +106,15 @@ class TestNumberChain(unittest.TestCase):
             kept = [x for x in seq if x.startswith("base_")]
             self.assertEqual(kept, base)
 
+    def test_chain_frame_labels(self):
+        base = [f"base_{i}.png" for i in range(6)]
+        with tempfile.TemporaryDirectory() as d:
+            _, meta = build_number_chain(base, Path(d), k=5, seed=7, label_frames=True)
+            labels = [f["label"] for f in meta["frames"]]
+            self.assertEqual(sorted(labels), sorted(f"Frame {p}" for p in meta["positions"]))
+            self.assertEqual({f["position"] for f in meta["frames"]}, set(meta["positions"]))
+            self.assertTrue(all(Path(f["path"]).exists() for f in meta["frames"]))
+
     def test_deterministic(self):
         base = [f"base_{i}.png" for i in range(6)]
         with tempfile.TemporaryDirectory() as d:
@@ -141,6 +150,7 @@ class TestBuildSample(unittest.TestCase):
             self.assertIn("manufacturing illegal drugs", s["key_phrase"])
             self.assertEqual(len(s["evidence"]), 5)
             self.assertEqual(s["meta"]["num_chain"], 5)
+            self.assertFalse(s["meta"]["chain_labels"])
             self.assertIsNotNone(s["meta"]["evidence_meta"][0]["prompt_tokens"])
 
 

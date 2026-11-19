@@ -207,10 +207,15 @@ def render_distributed_instruction(instruction: str, out_dir: Path) -> list[dict
 
 
 # ── 3. Number chain ─────────────────────────────────────────
-def render_chain_frame(path: Path, digit: int, next_line: str, first: bool) -> None:
+def render_chain_frame(
+    path: Path, digit: int, next_line: str, first: bool, frame_label: str | None = None
+) -> None:
     img = Image.new("RGB", (IMG_SIZE, IMG_SIZE), "white")
     d = ImageDraw.Draw(img)
     font = _font(48)
+    if frame_label:
+        # 诊断用：把该帧在整条序列里的位置明确写出来，帮助模型定位 "第 Y 帧"
+        d.text((24, 20), frame_label, fill=(90, 90, 90), font=_font(40, bold=False))
     y = 130
     if first:
         line = "This is the first number of the number chain."
@@ -241,7 +246,13 @@ def render_chain_frame(path: Path, digit: int, next_line: str, first: bool) -> N
     img.save(path)
 
 
-def build_number_chain(base_images: list[str], out_dir: Path, k: int = NUM_CHAIN, seed: int = 0):
+def build_number_chain(
+    base_images: list[str],
+    out_dir: Path,
+    k: int = NUM_CHAIN,
+    seed: int = 0,
+    label_frames: bool = False,
+):
     if k <= 0:
         return list(base_images), {"k": 0}
     rng = random.Random(seed)
@@ -267,7 +278,8 @@ def build_number_chain(base_images: list[str], out_dir: Path, k: int = NUM_CHAIN
         else:
             next_line = "This is the last number of the number chain."
         path = out_dir / f"chain_{t:02d}.png"
-        render_chain_frame(path, digit, next_line, first=(t == 0))
+        label = f"Frame {pos}" if label_frames else None
+        render_chain_frame(path, digit, next_line, first=(t == 0), frame_label=label)
         final[pos - 1] = str(path)
         frames.append(
             {
@@ -275,6 +287,7 @@ def build_number_chain(base_images: list[str], out_dir: Path, k: int = NUM_CHAIN
                 "position": pos,
                 "digit": digit,
                 "next_position": jump[t + 1] if t < k - 1 else None,
+                "label": label,
                 "path": str(path),
             }
         )
@@ -310,6 +323,7 @@ def build_dmn_sample(
     out_dir: Path,
     seed: int = 0,
     num_chain: int = NUM_CHAIN,
+    chain_labels: bool = False,
 ) -> dict:
     out_dir = Path(out_dir)
     key_phrase = extract_key_phrase(aux, instruction)
@@ -321,7 +335,7 @@ def build_dmn_sample(
     dist_meta = render_distributed_instruction(instruction, out_dir / "distributed")
     base_images = [m["path"] for m in dist_meta] + [m["path"] for m in ev_meta]
     sequence, chain_meta = build_number_chain(
-        base_images, out_dir / "chain", k=num_chain, seed=seed
+        base_images, out_dir / "chain", k=num_chain, seed=seed, label_frames=chain_labels
     )
     prompt = build_overall_prompt(evidence)
 
@@ -352,6 +366,7 @@ def build_dmn_sample(
             "num_distributed": len(dist_meta),
             "num_evidence": len(ev_meta),
             "num_chain": num_chain,
+            "chain_labels": chain_labels,
             "seed": seed,
             "chain": chain_meta,
             "evidence_meta": ev_meta,

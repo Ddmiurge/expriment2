@@ -57,6 +57,11 @@ def main() -> int:
     p.add_argument("--limit", type=int, default=40)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--num-chain", type=int, default=5)
+    p.add_argument(
+        "--chain-labels",
+        action="store_true",
+        help="诊断用：在 chain 帧左上角写 Frame N（N=整条序列位置）；默认关闭，保持原文版式",
+    )
     p.add_argument("--aux-model-key", default="judge_qwen3_8b")
     p.add_argument("--t2i-backend", choices=["flux", "sdxl"], default="flux")
     p.add_argument("--flux-model", default=None, help="FLUX 路径；默认读 paths.yaml models.flux")
@@ -121,6 +126,7 @@ def main() -> int:
                 out_dir=Path(a.out_dir) / rec["uid"],
                 seed=a.seed + n,
                 num_chain=a.num_chain,
+                chain_labels=a.chain_labels,
             )
         except DmnGenerationError as e:
             print(f"  ✗ 跳过：{e}")
