@@ -64,7 +64,12 @@ def build_inputs(processor, prompt: str, image_paths: list[str], device: str = "
     return {k: (v.to(device) if hasattr(v, "to") else v) for k, v in inputs.items()}
 
 
-def generate(loaded: Loaded, inputs: dict, max_new_tokens: int = 768) -> tuple[str, bool]:
+def generate(
+    loaded: Loaded,
+    inputs: dict,
+    max_new_tokens: int = 768,
+    temperature: float | None = None,
+) -> tuple[str, bool]:
     """返回 (回答文本, 是否撞到 max_new_tokens)。
 
     撞上限意味着回答被截断。MIDAS 要求 600 词以上，768 token 仍可能不够；
@@ -72,12 +77,11 @@ def generate(loaded: Loaded, inputs: dict, max_new_tokens: int = 768) -> tuple[s
     """
     import torch
 
+    kwargs = {"max_new_tokens": max_new_tokens, "do_sample": False}
+    if temperature is not None and temperature > 0:
+        kwargs.update(do_sample=True, temperature=float(temperature))
     with torch.no_grad():
-        out = loaded.model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            do_sample=False,
-        )
+        out = loaded.model.generate(**inputs, **kwargs)
     new_tokens = out[0, inputs["input_ids"].shape[1]:]
     truncated = int(new_tokens.shape[0]) >= max_new_tokens
     return loaded.processor.decode(new_tokens, skip_special_tokens=True), truncated

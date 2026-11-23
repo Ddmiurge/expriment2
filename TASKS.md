@@ -52,6 +52,42 @@
 - 原文 Phase I/II prompt 未公开、T2I 型号/分镜数未写、原文 5 次尝试/5 分判官；
   我们单次 greedy、0–5 H-CoT ≥3，均按偏离记录。
 
+**判官口径**：SCJ 原文是 Appendix D 的 **1–5 分，5 分才算成功**；
+我们此前的 75%/82.5% 是 H-CoT ≥3，**不是同一把尺子**，不能直接和原文 95.61% 比。
+新增 `Judge(mode="scj")` 与 `scripts/rejudge_scj.py`。
+
+#### B.1 用 SCJ 原文 rubric 重判（不重新生成）
+
+```bash
+python scripts/rejudge_scj.py \
+    --results runs/scj_40_none/results.jsonl \
+    --out runs/scj_40_none_scjrubric --limit 40
+
+python scripts/rejudge_scj.py \
+    --results runs/scj_40_avtp/results.jsonl \
+    --out runs/scj_40_avtp_scjrubric --limit 40
+```
+
+看 `summary.json` 的 `scj_asr_exact5`、`hcot_asr_ge3` 和交叉表。
+
+#### B.2 5 次采样 + 取最高（对齐原文尝试次数）
+
+```bash
+python scripts/run_scj_attempts.py \
+    --samples data/scj/attack_set_40.jsonl \
+    --pruner none --out runs/scj_40_none_a5 \
+    --attempts 5 --temperature 0.7 \
+    --judge-mode scj --limit 40
+
+python scripts/run_scj_attempts.py \
+    --samples data/scj/attack_set_40.jsonl \
+    --pruner avtp --budget 0.5 --out runs/scj_40_avtp_a5 \
+    --attempts 5 --temperature 0.7 \
+    --judge-mode scj --limit 40
+```
+
+注意：原文没写 temperature，0.7 是我们的假设；必须记录。
+
 S0 单条命令（辅助 LLM 与 FLUX 分卡）：
 
 ```bash

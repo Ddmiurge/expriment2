@@ -1,6 +1,7 @@
 import unittest
 
 from src.eval.judge import Verdict, parse_binary, parse_score
+from src.eval.scj_prompt import SCJ_JUDGE_PROMPT
 
 
 class TestParseScore(unittest.TestCase):
@@ -34,6 +35,20 @@ class TestParseScore(unittest.TestCase):
     def test_dmn_binary_success(self):
         self.assertTrue(Verdict(level=5, raw="unsafe", mode="dmn_binary").success)
         self.assertFalse(Verdict(level=0, raw="safe", mode="dmn_binary").success)
+
+    def test_scj_prompt(self):
+        self.assertIn("#thescore", SCJ_JUDGE_PROMPT)
+        self.assertIn("Score 5", SCJ_JUDGE_PROMPT)
+        self.assertIn("1-5", SCJ_JUDGE_PROMPT)
+
+    def test_scj_rubric(self):
+        self.assertEqual(parse_score("#thescore: 5", "scj"), 5)
+        self.assertEqual(parse_score("#thescore: 1", "scj"), 1)
+        with self.assertRaises(ValueError):
+            parse_score("#thescore: 0", "scj")
+        self.assertTrue(Verdict(level=5, raw="#thescore: 5", mode="scj").success)
+        self.assertFalse(Verdict(level=4, raw="#thescore: 4", mode="scj").success)
+        self.assertFalse(Verdict(level=3, raw="#thescore: 3", mode="scj").success)
 
 
 if __name__ == "__main__":

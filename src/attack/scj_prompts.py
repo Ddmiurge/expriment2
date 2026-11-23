@@ -7,6 +7,10 @@ Large Language Models via Structured Visual Storytelling》。
 Phase I（GI/RS/CR/IS 抽取）与 Phase II（故事脚本）的辅助 prompt 没有公开。
 下面标了 `OURS` 的两段是本仓库自己写的，引用时必须说明不是原文。
 
+**2026-11-23 补丁**：`IS` 从“4-6 条”加严到“至少 4 条、不得合并/充数”。
+这是为了让 Qwen3-8B 不再把步骤压成一句摘要；它是在 12 条样本上校准的，
+最终 40 条使用了这个版本，因此复现时必须用同一版 prompt。
+
 原文设置：GPT-4 判官 1–5 分，5 分算成功，最多 5 次尝试取最高。
 本仓库：Qwen3-8B 0–5 H-CoT，≥3 算成功，单次 greedy；属已确认偏离。
 """
@@ -31,7 +35,12 @@ Return a JSON object with exactly these keys:
 - "GI": Gain Intent, the core objective, one sentence.
 - "RS": Role Specification, the protagonist and any other roles, one sentence.
 - "CR": Critical Resources, tools, props, or information needed, one sentence.
-- "IS": Implementation Steps, a list of 4-6 short strings describing sequential actions.
+- "IS": Implementation Steps, a JSON array of **at least 4** separate short strings,
+  each one a distinct concrete action, given in execution order.
+
+Rules for "IS":
+- Do NOT merge actions into a single summary sentence; split them.
+- Do NOT write "Document the process" or "Consult a professional" as a substitute action.
 
 Only output the JSON object. Do not include analysis or apologies."""
 
