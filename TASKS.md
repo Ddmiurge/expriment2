@@ -1,4 +1,77 @@
-# TASKS · 本轮：MIDAS 4096 重跑 + MIR none/AVTP（2026-11-18）
+# TASKS · 当前：Qwen3.7 预检 + SCJ 复现（2026-11-23）
+
+> 本周两个并行 track：
+> A. **Qwen3.7-VL 预检 + DMN 复测**：先过模型/AVTP 兼容性，再 10→40 条。
+> B. **Sequential Comics（SCJ）复现**：S0→S1→S2→S3，先 Qwen3-VL-8B。
+> Track C（DMN 文本消融、MIDAS 20/25）暂缓，等 A/B 有结果再排。
+>
+> 计划细节见 `2026-11-20_weekly_report.md` 的“下周计划”与本次对话计划。
+
+## A · Qwen3.7 预检（硬门槛）
+
+> **2026-11-23 决策**：先试 **Qwen3.5-9B**（开源、9B、原生视觉语言），
+> 再试 InternVL3.5-8B / GLM-4.6V-Flash；Qwen3.7 只查到 API，不能本地剪枝。
+> 候选表见 `protocols/model_shortlist_2026-11-23.md`。
+>
+> **2026-11-23 查证**：目前公开到的 Qwen3.7 是 **API 模型**：
+> Qwen3.7-Max 纯文本；Qwen3.7-Plus / Qwen3.7-Flash 支持图像输入，但官方页面只给 API 调用，
+> 没有给出本地权重；QwenLM GitHub 的 pinned 仓库是 Qwen3.8 / Qwen3-VL，没有 Qwen3.7。
+> 因此 **Qwen3.7 很可能无法本地跑 AVTP**：只能走 API 做 `none` 攻击，不能做剪枝对照。
+> 需要先确认是否有未公开的本地权重；没有就换开源多模态模型，或只把 API 当 `none` 基线。
+
+1. 确认实际模型 ID/路径，**必须是多模态 VL**；纯文本版本不能做 DMN/SCJ。
+2. 填 `env/paths.yaml` 的 `qwen37_vl`（示例见 `env/paths.example.yaml`）。
+3. Qwen3.5-9B 先跑预检，不加载权重：
+   ```bash
+   python scripts/probe_victim_model.py --model <Qwen3.5-9B路径>
+   ```
+4. 加载 2 图前向，看显存与多图支持：
+   ```bash
+   python scripts/probe_victim_model.py --model <Qwen3.5-9B路径> --load
+   ```
+5. Qwen3.5 先只跑 `none`（不做 AVTP）：
+   ```bash
+   python scripts/run_none_vlm.py --model <Qwen3.5-9B路径> \
+       --attack dmn --samples data/dmn/attack_set_40.jsonl \
+       --out runs/dmn_qwen35_none --limit 10 --max-new-tokens 3072
+   ```
+6. AVTP 移植另开任务；Qwen3.5 的混合 linear/full attention 不能直接套 Qwen3-VL 补丁。
+7. **独立 venv**：Qwen3.5 需要 transformers 5.x；主 venv 固定 4.57.1，
+   不要升级主 venv，否则 AVTP 的 Qwen3-VL 补丁会坏。`probe_victim_model.py` /
+   `run_none_vlm.py` 在 qwen35 venv 里跑；`run_stage1.py`/AVTP 留在主 venv。
+5. 只有 `model_type=qwen3_vl` 且 AVTP 补丁能移植，才继续 DMN 剪枝对照；
+   否则只跑 `none`，或回退 Qwen3-VL-8B，不静默替换。
+
+## B · SCJ 复现（ours）
+
+- 代码：`src/attack/scj_prompts.py`（PT1/PT2/PT3 逐字；Phase I/II 为 ours）、
+  `src/attack/scj.py`、`scripts/build_scj_set.py`；
+- `run_stage1.py --attack scj` 已接入；
+- 固定：封面 + 6 分镜 = 7 图/条；FLUX.1-schnell；T2I 只画画面，PIL 叠字幕（偏离，见日志）；
+- 关卡：S0 1 条 → S1 10 条（`none` ASR ≥20%）→ S2 40 条 `none` → S3 40 条 `avtp` 0.5。
+- 原文 Phase I/II prompt 未公开、T2I 型号/分镜数未写、原文 5 次尝试/5 分判官；
+  我们单次 greedy、0–5 H-CoT ≥3，均按偏离记录。
+
+S0 单条命令（辅助 LLM 与 FLUX 分卡）：
+
+```bash
+CUDA_VISIBLE_DEVICES=3,4 python scripts/build_scj_set.py \
+    --input data/midas/questions_tiny.jsonl \
+    --out data/scj/d0.jsonl --out-dir data/scj/images_d0 \
+    --limit 1 --panels 6 --t2i-backend flux \
+    --aux-device cuda:0 --t2i-device cuda:1
+
+CUDA_VISIBLE_DEVICES=3 python scripts/run_stage1.py --attack scj \
+    --samples data/scj/d0.jsonl --pruner none \
+    --out runs/scj_d0 --limit 1 \
+    --max-new-tokens 3072 --judge-mode hcot
+```
+
+S0 看四样：7 张图是否齐全、封面 theme 是否可读、分镜字幕是否可读、回答是否有编号步骤。
+
+---
+
+# 历史：MIDAS 4096 重跑 + MIR none/AVTP（2026-11-18）
 
 > **本轮只跑 4 个格**：MIDAS `none`/`avtp` 4096；MIR `none`/`avtp` 4096。
 > 判官统一 0–5 H-CoT；同一数据集内部配对；两个数据集不混在一起比。

@@ -17,10 +17,13 @@
 
 | 角色 | 选择 | 依据 |
 |---|---|---|
-| 受害者模型 | **Qwen3-VL-8B** | AVTP 官方给了 Qwen3-VL 的 modeling patch；多图原生支持；8B 权重约 16 GB，单张 4090 可跑 |
+| 受害者模型 | **Qwen3-VL-8B**（主） | AVTP 官方给了 Qwen3-VL 的 modeling patch；多图原生支持；8B 权重约 16 GB，单张 4090 可跑 |
+| 新模型（本周预检） | **Qwen3.5-9B** | 开源、9B、原生视觉语言；先跑 `none`，AVTP 需移植；Qwen3.7 只查到 API |
 | 剪枝器 A | **AVTP**（作者代码） | 唯一有真代码的多图剪枝器；**图级自适应预算**，图与图争预算 |
 | 剪枝器 B | **SIEVE-alloc**（本仓库实现） | SIEVE 无代码；先复现它最关键的一条规则——**每图等额配额**（按总预算平均到每图，图与图不争预算） |
-| 攻击 | **MIDAS**（作者代码，离线改造） | 多图越狱，载荷分散在多张图、每词至少 2 张，正好检验「备份抗删除」 |
+| 攻击 A | **MIDAS**（作者代码，离线改造） | 多图越狱，载荷分散在多张图、每词至少 2 张，正好检验「备份抗删除」 |
+| 攻击 B | **DMN**（复现 ours，非作者代码） | 组合式多图越狱：拆词图 + 5 证据图 + 5 number chain；原文无代码 |
+| 攻击 C | **Sequential Comics / SCJ**（复现 ours） | 漫画分镜叙事越狱；四阶段、封面+6 分镜；原文无代码，Phase I/II prompt 也未公开 |
 | 指令来源（主实验） | **MM-SafetyBench tiny + `Changed Question`** | MIDAS Table 2 同源；168 个 tiny ID + 自包含祈使句，图由 MIDAS 生成；按 13 类分层抽 40 |
 | 泛化基准（单独表） | **MIR-SafetyBench** | 用自己的 `revised_prompt` + 图，不抽问题喂 MIDAS |
 | 判官 | **Qwen3-8B + 论文 0–5 H-CoT** | ASR=score≥3；四档只在 `--judge-mode 4level` 时作对照 |
@@ -188,7 +191,7 @@ multi-image-code/
 │   ├── common/              路径、随机种子、统一 no-think chat template
 │   ├── models/              Qwen3-VL 加载与多图输入构造
 │   ├── pruning/             图像布局、AVTP 注入与配置、SIEVE-alloc
-│   ├── attack/              MIDAS 离线化、差图载荷掩码
+│   ├── attack/              MIDAS 离线化、DMN、SCJ、差图载荷掩码
 │   ├── eval/                0–5 H-CoT 判官、载荷存活率、回答诊断、配对统计
 │   └── data/                MIDAS / MM-SafetyBench / MIR-SafetyBench 读取
 ├── tests/                   纯 Python 单测（不占 GPU）

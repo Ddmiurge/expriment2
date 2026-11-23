@@ -7,6 +7,11 @@
 models:
   qwen3vl_8b:       /path/to/models/Qwen3-VL-8B-Instruct
   judge_qwen3_8b:   /path/to/models/Qwen3-8B
+  # 新受害者占位；实际模型 ID/路径按服务器填写。
+  # 首选：Qwen3.5-9B（开源、原生视觉语言）。
+  # Qwen3.7 目前只看到 API（Plus/Flash 支持视觉），没有本地权重；
+  # API 模型不能跑 AVTP，只能通过 run_none_vlm.py 做 none 基线。
+  qwen35_9b:        /path/to/models/Qwen3.5-9B
   # DMN 的 T2I（原文是 GPT Image 1，属已确认偏离）
   # 主用 FLUX.1-schnell（T5 512 token）；SDXL 仅备选（CLIP 77 token 会截断）
   flux:             /path/to/models/FLUX.1-schnell

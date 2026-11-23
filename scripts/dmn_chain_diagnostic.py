@@ -101,7 +101,7 @@ def main() -> int:
         labeled = rebuild(s, Path(a.out_dir))
         chain = labeled["meta"]["chain"]
         labels = [f["label"] for f in chain["frames"]]
-        physical = [d for _, d in sorted(zip(chain["positions"], chain["digits"]))]
+        physical = [d for _, d in sorted(zip(chain["jump"], chain["digits"]))]
         print(f"{s['uid']}: {len(s['images'])} 图 -> {len(labeled['images'])} 图；chain 角标 {labels}")
         print(f"  按指针顺序应读: {chain['digits']}（jump={chain['jump']}）")
         print(f"  按物理顺序会读: {physical}")
