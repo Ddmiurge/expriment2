@@ -47,7 +47,7 @@ from src.eval.survival import (  # noqa: E402
     kept_fraction_by_image_index,
 )
 from src.models.qwen3vl import build_inputs, generate, layout, load  # noqa: E402
-from src.pruning import avtp  # noqa: E402
+from src.pruning import avtp, riprune  # noqa: E402
 from src.pruning.sieve import (  # noqa: E402
     capture_last_token_attention,
     default_layer,
@@ -171,7 +171,7 @@ def main() -> int:
     p.add_argument("--samples", default=str(Path("data") / "midas" / "attack_set.jsonl"))
     p.add_argument(
         "--pruner",
-        choices=["none", "avtp", "avtp_equal", "sieve", "sieve_random"],
+        choices=["none", "avtp", "avtp_equal", "sieve", "sieve_random", "riprune"],
         required=True,
         help="avtp/sieve 是主条件；avtp_equal/sieve_random 是拆机制的对照",
     )
@@ -286,6 +286,12 @@ def main() -> int:
 
         t0 = time.time()
         n_new = a.max_new_tokens or rt.get("max_new_tokens", 768)
+        if a.pruner == "riprune":
+            avtp.disable()
+            riprune.enable(budget=a.budget, prototypes=16)
+        else:
+            riprune.disable()
+
         if a.pruner == "none":
             avtp.disable()
             kept = full_keep(grids)
@@ -299,6 +305,9 @@ def main() -> int:
             avtp.configure(method="equal", budget=a.budget, record_scores=False)
             response, truncated = generate(loaded, inputs, n_new)
             kept = avtp.last_kept_local() or full_keep(grids)
+        elif a.pruner == "riprune":
+            response, truncated = generate(loaded, inputs, n_new)
+            kept = riprune.last_kept_local() or full_keep(grids)
         elif a.pruner in ("sieve", "sieve_random"):
             avtp.disable()
             if a.pruner == "sieve":

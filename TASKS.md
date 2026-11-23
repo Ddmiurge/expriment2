@@ -107,6 +107,24 @@ S0 看四样：7 张图是否齐全、封面 theme 是否可读、分镜字幕�
 
 ---
 
+## C · RI-Prune（ours，2026-11-23 启动）
+
+- 代码：`src/pruning/riprune.py`（monkey patch `Qwen3VLModel.forward`）；
+- `run_stage1.py --pruner riprune` 已接入；
+- 原论文配置：P=16，λ=1，投影后/解码前，attention-free，每图等额 Top-K；
+- 摩擦见 `protocols/riprune_reproduction_notes.md`，**尚未推送/未跑真实模型**。
+
+```bash
+# 1 条 MIDAS smoke
+python scripts/run_stage1.py --attack midas \
+    --samples data/midas/attack_set.jsonl --pruner riprune --budget 0.5 \
+    --out runs/riprune_midas_smoke --limit 1 \
+    --max-new-tokens 3072 --judge-mode hcot
+```
+
+看输出非空、keepfrac≈0.5、显存；通过后再 10 条。
+
+
 # 历史：MIDAS 4096 重跑 + MIR none/AVTP（2026-11-18）
 
 > **本轮只跑 4 个格**：MIDAS `none`/`avtp` 4096；MIR `none`/`avtp` 4096。

@@ -78,7 +78,7 @@ def parse_score(raw: str, mode: str) -> int:
         return parse_binary(raw)
     hi = 5 if mode in ("hcot", "scj") else 3
     m = re.search(
-        rf"the\s*score\s*[:：]?\s*[\*_`\s]*([0-{hi}])", raw, re.I
+        rf"the\s*score\s*[:：]?\s*[\*_`\s\[\(\{{\"']*([0-{hi}])", raw, re.I
     )
     if not m:
         m = re.search(rf"\bscore\b[^\d]{{0,20}}([0-{hi}])", raw, re.I)

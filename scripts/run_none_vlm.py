@@ -72,7 +72,14 @@ def build_inputs(processor, prompt: str, image_paths: list[str], device: str):
     content = [{"type": "image"} for _ in image_paths]
     content.append({"type": "text", "text": prompt})
     messages = [{"role": "user", "content": content}]
-    text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    # Qwen3.5 默认开 thinking（会在 3072 预算内吐完推理还没给答案）。
+    # 与其余列的非 thinking instruct 受害者对齐，显式关掉；不支持的模型忽略参数。
+    try:
+        text = processor.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
+        )
+    except TypeError:
+        text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     inputs = processor(text=[text], images=images, return_tensors="pt", padding=True)
     return {k: (v.to(device) if hasattr(v, "to") else v) for k, v in inputs.items()}
 

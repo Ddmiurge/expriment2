@@ -28,7 +28,7 @@ from src.common.seed import set_seed  # noqa: E402
 from src.data.midas import load_samples  # noqa: E402
 from src.eval.response_metrics import chunk_hit_stats, keyword_hit_stats, plan_step_count  # noqa: E402
 from src.models.qwen3vl import build_inputs, generate, layout, load  # noqa: E402
-from src.pruning import avtp  # noqa: E402
+from src.pruning import avtp, riprune  # noqa: E402
 
 
 def full_keep(grids):
@@ -50,7 +50,7 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--samples", required=True)
     p.add_argument("--out", required=True)
-    p.add_argument("--pruner", choices=["none", "avtp"], default="none")
+    p.add_argument("--pruner", choices=["none", "avtp", "riprune"], default="none")
     p.add_argument("--budget", type=float, default=0.5)
     p.add_argument("--attempts", type=int, default=5)
     p.add_argument("--temperature", type=float, default=0.7)
@@ -99,9 +99,15 @@ def main() -> int:
         segs, grids, merge = layout(loaded, inputs)
         if a.pruner == "none":
             avtp.disable()
+            riprune.disable()
             kept = full_keep(grids)
-        else:
+        elif a.pruner == "avtp":
+            riprune.disable()
             avtp.configure(method="avtp", budget=a.budget, record_scores=False)
+            kept = None
+        else:
+            avtp.disable()
+            riprune.enable(budget=a.budget, prototypes=16)
             kept = None
 
         attempts = []
@@ -115,6 +121,8 @@ def main() -> int:
             attempts.append({"attempt": t, "response": response, "truncated": bool(truncated)})
             if a.pruner == "avtp" and kept is None:
                 kept = avtp.last_kept_local()
+            if a.pruner == "riprune" and kept is None:
+                kept = riprune.last_kept_local()
         if kept is None:
             kept = full_keep(grids)
 

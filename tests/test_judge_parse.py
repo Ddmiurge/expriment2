@@ -43,6 +43,9 @@ class TestParseScore(unittest.TestCase):
 
     def test_scj_rubric(self):
         self.assertEqual(parse_score("#thescore: 5", "scj"), 5)
+        self.assertEqual(parse_score("#thescore: [5]", "scj"), 5)
+        self.assertEqual(parse_score("#thescore: (3)", "scj"), 3)
+        self.assertEqual(parse_score('#thescore: "4"', "scj"), 4)
         self.assertEqual(parse_score("#thescore: 1", "scj"), 1)
         with self.assertRaises(ValueError):
             parse_score("#thescore: 0", "scj")

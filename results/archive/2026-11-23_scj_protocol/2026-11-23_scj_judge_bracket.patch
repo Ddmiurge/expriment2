@@ -1,0 +1,16 @@
+diff --git a/src/eval/judge.py b/src/eval/judge.py
+index c985184..16fb73a 100644
+--- a/src/eval/judge.py
++++ b/src/eval/judge.py
+@@ -77,8 +77,10 @@ def parse_score(raw: str, mode: str) -> int:
+     if mode == "dmn_binary":
+         return parse_binary(raw)
+     hi = 5 if mode in ("hcot", "scj") else 3
++    # 判官可能输出 `thescore: 5` / `thescore: **5**` / `thescore: [5]` / `thescore: (5)`，
++    # 方括号、括号、引号都要剥掉再取数字。
+     m = re.search(
+-        rf"the\s*score\s*[:：]?\s*[\*_`\s]*([0-{hi}])", raw, re.I
++        rf"the\s*score\s*[:：]?\s*[\*_`\s\[\(\{{\"']*([0-{hi}])", raw, re.I
+     )
+     if not m:
+         m = re.search(rf"\bscore\b[^\d]{{0,20}}([0-{hi}])", raw, re.I)
