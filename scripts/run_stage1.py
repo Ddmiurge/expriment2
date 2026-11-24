@@ -167,7 +167,7 @@ def build_reused_rec(
 
 def main() -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("--attack", choices=["midas", "mir", "dmn", "scj"], default="midas")
+    p.add_argument("--attack", choices=["midas", "mir", "dmn", "scj", "siva"], default="midas")
     p.add_argument("--samples", default=str(Path("data") / "midas" / "attack_set.jsonl"))
     p.add_argument(
         "--pruner",
@@ -226,7 +226,7 @@ def main() -> int:
         for s in samples:
             if a.attack == "midas":
                 issues = validate_sample(s)
-            elif a.attack in ("dmn", "scj"):
+            elif a.attack in ("dmn", "scj", "siva"):
                 issues = [
                     f"缺图 {im['path']}" for im in s.get("images", [])
                     if not Path(im["path"]).exists()

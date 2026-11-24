@@ -25,6 +25,7 @@
 | 攻击 A | **MIDAS**（作者代码，离线改造） | 多图越狱，载荷分散在多张图、每词至少 2 张，正好检验「备份抗删除」 |
 | 攻击 B | **DMN**（复现 ours，非作者代码） | 组合式多图越狱：拆词图 + 5 证据图 + 5 number chain；原文无代码 |
 | 攻击 C | **Sequential Comics / SCJ**（复现 ours） | 漫画分镜叙事越狱；四阶段、封面+6 分镜；原文无代码，Phase I/II prompt 也未公开 |
+| 攻击 D | **SIVA-Direct**（复现 ours） | 把一张有害图按比例切块，固定 benign query；只做 Direct，不含 Adaptive/Transfer |
 | 指令来源（主实验） | **MM-SafetyBench tiny + `Changed Question`** | MIDAS Table 2 同源；168 个 tiny ID + 自包含祈使句，图由 MIDAS 生成；按 13 类分层抽 40 |
 | 泛化基准（单独表） | **MIR-SafetyBench** | 用自己的 `revised_prompt` + 图，不抽问题喂 MIDAS |
 | 判官 | **Qwen3-8B + 论文 0–5 H-CoT** | ASR=score≥3；四档只在 `--judge-mode 4level` 时作对照 |

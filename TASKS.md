@@ -175,6 +175,25 @@ python scripts/run_stage1.py --attack scj --samples data/scj/attack_set_40_fixed
 5 次采样用 `scripts/run_scj_attempts.py --samples data/scj/attack_set_40_fixed.jsonl ...`。
 
 
+## E · SIVA-Direct（ours，2026-11-24）
+
+- 方法：`src/attack/siva.py`；构建：`scripts/build_siva_set.py`；
+- 数据：`scripts/export_mmsb_images.py` 从 MM-SafetyBench parquet 导出 40 张；
+- 主跑 `1:1:1`，可选 `1:1`/`1:2`/`1:3`/`1:1:1:1`；
+- 说明与摩擦：`protocols/siva_reproduction_notes.md`；
+- 注意：原文数据集是 JailbreakV/FR/NSFW，我们用 MM-SafetyBench 替代，只能叫 SIVA-Direct (ours)。
+
+```bash
+python scripts/export_mmsb_images.py --mmsb-root ~/data/MM-SafetyBench \
+    --questions data/midas/questions_tiny.jsonl \
+    --out-dir data/siva/mmsb_images --out-jsonl data/siva/mmsb_40.jsonl --limit 40
+
+python scripts/build_siva_set.py --input data/siva/mmsb_40.jsonl \
+    --out data/siva/attack_set_40_111.jsonl \
+    --out-dir data/siva/images_111 --ratio 1:1:1 --limit 40
+```
+
+
 # 历史：MIDAS 4096 重跑 + MIR none/AVTP（2026-11-18）
 
 > **本轮只跑 4 个格**：MIDAS `none`/`avtp` 4096；MIR `none`/`avtp` 4096。
