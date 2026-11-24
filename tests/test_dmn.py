@@ -67,6 +67,12 @@ class TestPrompts(unittest.TestCase):
         self.assertIn("The set of text evidence items are:1. evidence 0", s)
         self.assertIn("number chain", s)
 
+    def test_overall_prefers_image_description(self):
+        meta = [{"prompt": f"visual description {i}"} for i in range(5)]
+        s = build_overall_prompt(CASE["evidence_list"], meta)
+        self.assertIn("1. visual description 0", s)
+        self.assertNotIn("evidence 0 on a table", s)
+
 
 class TestJson(unittest.TestCase):
     def test_code_fence(self):

@@ -3,6 +3,7 @@ import unittest
 import torch
 
 from src.pruning.riprune import (
+    _cache_has_tokens,
     prune_predecoder,
     query_positions_after_last_image,
     quotas,
@@ -11,6 +12,19 @@ from src.pruning.riprune import (
 
 
 class TestRiprune(unittest.TestCase):
+    def test_cache_has_tokens(self):
+        class Empty:
+            def get_seq_length(self):
+                return 0
+
+        class Full:
+            def get_seq_length(self):
+                return 7
+
+        self.assertFalse(_cache_has_tokens(None))
+        self.assertFalse(_cache_has_tokens(Empty()))
+        self.assertTrue(_cache_has_tokens(Full()))
+
     def test_quotas(self):
         self.assertEqual(quotas(10, 3, [4, 4, 4]), [4, 3, 3])
         # 第二张图容量不足，剩余分给其他图

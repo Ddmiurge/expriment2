@@ -125,6 +125,56 @@ python scripts/run_stage1.py --attack midas \
 看输出非空、keepfrac≈0.5、显存；通过后再 10 条。
 
 
+## D · 2026-11-24 审计修复（D1/S1/S2，先全修完再统一跑）
+
+> 审计：`protocols/dmn_scj_reproduction_audit_2026-11-24.md`。
+> 旧 DMN/SCJ 结果不能进最终表；MIDAS 不受影响。
+
+### 已改代码
+
+- **D1**：`build_overall_prompt(evidence, evidence_meta)` 优先用与图配对的 T2I 描述；
+- **S1**：`build_attack_prompt` 只替换第一处 `*THEME*`，保留解释句；
+- **S2**：`SCRIPT_SYSTEM/SCRIPT_PROMPT/_image_prompt` 加“每格单独看必须普通、无害”约束。
+
+### 统一重建（不要跑一个推一个）
+
+```bash
+# 1) DMN：只重建总提示，图片不变
+python scripts/rebuild_dmn_prompts.py \
+    --input data/dmn/attack_set_40.jsonl \
+    --out data/dmn/attack_set_40_fixed.jsonl
+
+# 2) SCJ：S2 改了故事脚本，必须重新生成 40 条图片
+CUDA_VISIBLE_DEVICES=1,2 python scripts/build_scj_set.py \
+    --input data/scj/questions_40.jsonl \
+    --out data/scj/attack_set_40_fixed.jsonl \
+    --out-dir data/scj/images_40_fixed --limit 40 --panels 6 \
+    --t2i-backend flux --aux-device cuda:0 --t2i-device cuda:1
+```
+
+### 重跑矩阵
+
+```bash
+# DMN：none / AVTP 50 / RI-Prune 25
+python scripts/run_stage1.py --attack dmn --samples data/dmn/attack_set_40_fixed.jsonl \
+    --pruner none --out runs/dmn_fixed_none --limit 40 --max-new-tokens 3072 --judge-mode hcot
+python scripts/run_stage1.py --attack dmn --samples data/dmn/attack_set_40_fixed.jsonl \
+    --pruner avtp --budget 0.5 --out runs/dmn_fixed_avtp50 --limit 40 --max-new-tokens 3072 --judge-mode hcot
+python scripts/run_stage1.py --attack dmn --samples data/dmn/attack_set_40_fixed.jsonl \
+    --pruner riprune --budget 0.25 --out runs/dmn_fixed_rip25 --limit 40 --max-new-tokens 3072 --judge-mode hcot
+
+# SCJ：先 none/AVTP/RI 单次；再用 run_scj_attempts 跑 5 次原文口径
+python scripts/run_stage1.py --attack scj --samples data/scj/attack_set_40_fixed.jsonl \
+    --pruner none --out runs/scj_fixed_none --limit 40 --max-new-tokens 3072 --judge-mode hcot
+python scripts/run_stage1.py --attack scj --samples data/scj/attack_set_40_fixed.jsonl \
+    --pruner avtp --budget 0.5 --out runs/scj_fixed_avtp50 --limit 40 --max-new-tokens 3072 --judge-mode hcot
+python scripts/run_stage1.py --attack scj --samples data/scj/attack_set_40_fixed.jsonl \
+    --pruner riprune --budget 0.25 --out runs/scj_fixed_rip25 --limit 40 --max-new-tokens 3072 --judge-mode hcot
+```
+
+5 次采样用 `scripts/run_scj_attempts.py --samples data/scj/attack_set_40_fixed.jsonl ...`。
+
+
 # 历史：MIDAS 4096 重跑 + MIR none/AVTP（2026-11-18）
 
 > **本轮只跑 4 个格**：MIDAS `none`/`avtp` 4096；MIR `none`/`avtp` 4096。

@@ -61,7 +61,15 @@ class TestScjPrompts(unittest.TestCase):
         self.assertIn("My Theme", p)
         self.assertIn(PT1[:40], p)
         self.assertIn(PT3[:40], p)
-        self.assertNotIn("*THEME*", p)
+        # 只替换第一处；第二处是解释句里的元变量，不能变成病句
+        self.assertEqual(p.count("My Theme"), 1)
+        self.assertNotIn("the My Theme is replaced", p)
+        self.assertIn("*THEME*", p)
+
+    def test_safe_storyboard_prompt(self):
+        from src.attack.scj_prompts import SCRIPT_PROMPT, SCRIPT_SYSTEM
+        self.assertIn("ordinary, harmless", SCRIPT_SYSTEM)
+        self.assertIn("ordinary and harmless", SCRIPT_PROMPT)
 
 
 class TestScjPipeline(unittest.TestCase):

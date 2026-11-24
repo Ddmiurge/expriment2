@@ -238,9 +238,28 @@ def prune_predecoder(
     )
 
 
+def _cache_has_tokens(pkv) -> bool:
+    """transformers 4.57+ 在 prefill 会传空 DynamicCache（不是 None）。"""
+    if pkv is None:
+        return False
+    getter = getattr(pkv, "get_seq_length", None)
+    if callable(getter):
+        try:
+            return int(getter()) > 0
+        except Exception:  # noqa: BLE001
+            return True
+    if isinstance(pkv, (tuple, list)):
+        return bool(pkv) and pkv[0] is not None
+    return True
+
+
 def _riprune_forward(self, *args, **kwargs):
     """替换 Qwen3VLModel.forward；只在 prefill 且 enabled 时剪枝。"""
-    if not _CONFIG["enabled"] or kwargs.get("pixel_values") is None or kwargs.get("past_key_values") is not None:
+    if (
+        not _CONFIG["enabled"]
+        or kwargs.get("pixel_values") is None
+        or _cache_has_tokens(kwargs.get("past_key_values"))
+    ):
         return _ORIGINAL_FORWARD(self, *args, **kwargs)
     _STATE.pop("error", None)
 
@@ -263,23 +282,35 @@ def _riprune_forward(self, *args, **kwargs):
     if inputs_embeds is None:
         inputs_embeds = self.get_input_embeddings()(input_ids)
 
-    image_outputs = self.get_image_features(pixel_values, image_grid_thw, return_dict=True)
-    image_embeds = torch.cat(image_outputs.pooler_output, dim=0).to(inputs_embeds.device, inputs_embeds.dtype)
-    deepstack = image_outputs.deepstack_features
+    # transformers 5.x: return_dict=True；4.57.1: 返回 tuple，不接受 return_dict。
+    try:
+        image_outputs = self.get_image_features(pixel_values, image_grid_thw, return_dict=True)
+        image_list = image_outputs.pooler_output
+        deepstack = image_outputs.deepstack_features
+    except TypeError:
+        image_list, deepstack = self.get_image_features(pixel_values, image_grid_thw)
+    image_embeds = torch.cat(list(image_list), dim=0).to(inputs_embeds.device, inputs_embeds.dtype)
     image_mask, _ = self.get_placeholder_mask(input_ids, inputs_embeds=inputs_embeds, image_features=image_embeds)
     inputs_embeds = inputs_embeds.masked_scatter(image_mask, image_embeds)
     visual_pos_masks = image_mask[..., 0]
 
     if position_ids is None:
-        position_ids = self.compute_3d_position_ids(
-            input_ids=input_ids,
-            image_grid_thw=image_grid_thw,
-            video_grid_thw=None,
-            inputs_embeds=inputs_embeds,
-            attention_mask=attention_mask,
-            past_key_values=None,
-            mm_token_type_ids=mm_token_type_ids,
-        )
+        if hasattr(self, "compute_3d_position_ids"):
+            position_ids = self.compute_3d_position_ids(
+                input_ids=input_ids,
+                image_grid_thw=image_grid_thw,
+                video_grid_thw=None,
+                inputs_embeds=inputs_embeds,
+                attention_mask=attention_mask,
+                past_key_values=None,
+                mm_token_type_ids=mm_token_type_ids,
+            )
+        else:
+            # transformers 4.57.1 的旧 API
+            position_ids, rope_deltas = self.get_rope_index(
+                input_ids, image_grid_thw, None, attention_mask=attention_mask
+            )
+            self.rope_deltas = rope_deltas
 
     # 每图 token 数：t*h*w / merge^2
     merge = int(self.config.vision_config.spatial_merge_size)
@@ -321,6 +352,8 @@ def _riprune_forward(self, *args, **kwargs):
             "input_ids", "attention_mask", "position_ids", "inputs_embeds",
             "pixel_values", "pixel_values_videos", "image_grid_thw", "video_grid_thw",
             "past_key_values", "mm_token_type_ids",
+            # 剪枝后序列变短，cache_position 长度会与新 embeddings 对不齐。
+            "cache_position",
         }},
     )
     return Qwen3VLModelOutputWithPast(**outputs, rope_deltas=self.rope_deltas)

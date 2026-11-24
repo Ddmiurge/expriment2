@@ -304,12 +304,27 @@ def build_number_chain(
 
 
 # ── 4. 总提示与样本 ─────────────────────────────────────────
-def build_overall_prompt(evidence_list: list[dict]) -> str:
+def build_overall_prompt(
+    evidence_list: list[dict],
+    evidence_meta: list[dict] | None = None,
+) -> str:
+    """Table 17 的文本证据：优先用与图片配对的 T2I 描述。
+
+    原文 Table 17 的第二部分是“文本证据 + 图像一一配对”，
+    文本证据是 Table 11 输出的**视觉描述**，不是 Table 10 的原始案件记录。
+    `evidence_meta[i]["prompt"]` 就是实际送去 T2I 的那段描述；没有时退回旧字段。
+    """
     lines = []
     for i, e in enumerate(evidence_list, 1):
-        desc = str(e.get("description", "")).strip()
-        det = str(e.get("details", "")).strip()
-        lines.append(f"{i}. {desc} {det}".strip())
+        if evidence_meta and i <= len(evidence_meta):
+            desc = str(evidence_meta[i - 1].get("prompt", "")).strip()
+        else:
+            desc = ""
+        if not desc:
+            d = str(e.get("description", "")).strip()
+            det = str(e.get("details", "")).strip()
+            desc = f"{d} {det}".strip()
+        lines.append(f"{i}. {desc}")
     return P.OVERALL_PROMPT.replace("{evidence_text}", "\n".join(lines))
 
 
@@ -337,7 +352,7 @@ def build_dmn_sample(
     sequence, chain_meta = build_number_chain(
         base_images, out_dir / "chain", k=num_chain, seed=seed, label_frames=chain_labels
     )
-    prompt = build_overall_prompt(evidence)
+    prompt = build_overall_prompt(evidence, ev_meta)
 
     images = []
     dist_by_path = {m["path"]: m for m in dist_meta}
@@ -367,6 +382,7 @@ def build_dmn_sample(
             "num_evidence": len(ev_meta),
             "num_chain": num_chain,
             "chain_labels": chain_labels,
+            "evidence_source": "t2i_prompt",
             "seed": seed,
             "chain": chain_meta,
             "evidence_meta": ev_meta,

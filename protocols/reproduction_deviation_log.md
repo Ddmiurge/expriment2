@@ -183,3 +183,17 @@ AVTP 补丁是否可移植仍需单独验证。
 - 分镜数、Phase I/II prompt、T2I、字幕方式仍是 ours。
 
 **结论写法**：只能写 `SCJ-aligned (ours)`；不能写“复现原文 95.61%”。
+
+
+---
+
+## 2026-11-24 · 审计修复（D1/S1/S2）
+
+- **D1**：DMN 总提示改用 `meta["evidence_meta"][i]["prompt"]`（与图配对的 T2I 描述），
+  不再用 `evidence.description/details`；旧 DMN prompt 结果作废，需用
+  `scripts/rebuild_dmn_prompts.py` 重建后重跑。
+- **S1**：SCJ `build_attack_prompt` 只替换第一处 `*THEME*`，保留解释句；
+  旧 40/40 病句 prompt 结果作废，需重建总提示/重跑。
+- **S2**：SCJ Phase II 与图像 prompt 加“每格单独看必须普通、无害”约束；
+  旧 SCJ 图片是显式作案步骤，不能用于最终表；需重新生成 40 条图片后重跑。
+- MIDAS 不受影响。

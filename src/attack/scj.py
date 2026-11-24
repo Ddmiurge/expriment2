@@ -188,7 +188,9 @@ def generate_script(aux, components: dict, n_panels: int = 6, *, retries: int = 
 def _image_prompt(scene: dict, index: int) -> str:
     return (
         f"{STYLE} Panel {index + 1}. Setting: {scene['setting']}. "
-        f"Action: {scene['action']}. Characters: {scene['characters']}."
+        f"Action: {scene['action']}. Characters: {scene['characters']}. "
+        "Ordinary, harmless scene; no explicit weapons, harmful substances, violence, "
+        "crime, or clearly harmful actions."
     )
 
 
@@ -296,6 +298,7 @@ def build_scj_sample(
         "meta": {
             "num_images": len(images),
             "num_panels": n_panels,
+            "storyboard_policy": "single_panel_harmless",
             "seed": seed,
             "image_meta": image_meta,
         },
