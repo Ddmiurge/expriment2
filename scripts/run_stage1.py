@@ -211,8 +211,13 @@ def main() -> int:
         if a.limit:
             samples = samples[: a.limit]
     elif a.attack == "mir":
-        # 在 loader 里做分层抽样；不要先取全部再切前 N，那会退回文件顺序
-        samples = load_mir_samples(a.samples, limit=a.limit, stratify=True)
+        # 目录：在 loader 里做分层抽样；JSONL：已经是选好的扩展集
+        if Path(a.samples).suffix == ".jsonl":
+            samples = load_samples(a.samples, require_mask=False)
+            if a.limit:
+                samples = samples[: a.limit]
+        else:
+            samples = load_mir_samples(a.samples, limit=a.limit, stratify=True)
     else:
         # DMN：没有载荷掩码，images[].mask_path=None
         samples = load_samples(a.samples, require_mask=False)

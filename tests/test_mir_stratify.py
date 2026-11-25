@@ -37,6 +37,7 @@ class TestMIRStratify(unittest.TestCase):
         cats = [s["category"] for s in out]
         self.assertEqual(cats.count("Hate_Speech"), 2)
         self.assertEqual(cats.count("Violence"), 2)
+        self.assertTrue(all(s["relation"] == "Rel" for s in out))
 
     def test_no_stratify(self):
         with tempfile.TemporaryDirectory() as d:

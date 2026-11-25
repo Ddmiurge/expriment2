@@ -25,6 +25,7 @@ def _iter_json(path: Path) -> Iterator[dict]:
     obj = json.loads(path.read_text(encoding="utf-8"))
     items = obj if isinstance(obj, list) else [obj]
     category = path.parent.name
+    relation = path.stem.replace("_final", "")
     for i, it in enumerate(items):
         if not isinstance(it, dict):
             continue
@@ -36,6 +37,7 @@ def _iter_json(path: Path) -> Iterator[dict]:
             "id": sid,
             "uid": f"{category}__{sid}",
             "category": category,
+            "relation": relation,
             "instruction": it.get("original_question") or it.get("revised_prompt") or "",
             "prompt": it.get("revised_prompt") or it.get("original_question") or "",
             "images": [{"path": str(p), "mask_path": None} for p in images],

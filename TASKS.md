@@ -194,6 +194,20 @@ python scripts/build_siva_set.py --input data/siva/mmsb_40.jsonl \
 ```
 
 
+## F · MIR-180 扩展（2026-11-25）
+
+- 旧 MIR 只跑 40 条、按 6 类目分层，基线 17.5%（地板）。
+- 新脚本 `scripts/build_mir_expanded.py`：按 **9 种多图关系**各抽 20 条，共 180 条。
+- `run_stage1.py --attack mir` 现在支持 JSONL 样本。
+- 主表跑 none / AVTP25 / AVTP50 / RI25 / RI50；如果仍地板，保留列并注明“不可判定”。
+- 主表与待跑清单：`protocols/main_table_run_2026-11-25.md`。
+
+```bash
+python scripts/build_mir_expanded.py --root ~/data/MIR-SafetyBench \
+    --out data/mir/attack_set_180.jsonl --per-relation 20
+```
+
+
 # 历史：MIDAS 4096 重跑 + MIR none/AVTP（2026-11-18）
 
 > **本轮只跑 4 个格**：MIDAS `none`/`avtp` 4096；MIR `none`/`avtp` 4096。
