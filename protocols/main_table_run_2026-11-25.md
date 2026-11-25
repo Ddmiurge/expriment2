@@ -21,6 +21,36 @@
 | RI-Prune 25% | ⚠ 25.0%（10/40，28 截断） | ✅ 87.5%（35/40） | ✅ 90.0%（36/40） | ⬜ | ⬜ | ⬜ |
 | RI-Prune 50% | ⬜ | ⬜ | ⬜ | ✅ 7.5%（3/40） | ✅ 16.0%（12/75） | ⬜ |
 
+## 判官约定（不要再给 DMN/SIVA/SCJ 跑 H-CoT 主表）
+
+| 列 | 生成时 | 主表判官 |
+|---|---|---|
+| MIDAS | `--judge-mode hcot` | H-CoT |
+| DMN | `--no-judge` | `rejudge_dmn.py` 二分类 |
+| SCJ | `run_scj_attempts.py` | 5 次 + 原文 1–5 |
+| SIVA | `--no-judge` | `rejudge_siva_binary.py` 二分类 |
+| MIR | `--judge-mode hcot` | H-CoT（本地替代 HarmBench） |
+
+DMN 示例：
+
+```bash
+python scripts/run_stage1.py --attack dmn --samples data/dmn/attack_set_40_fixed.jsonl \
+    --pruner avtp --budget 0.25 --out runs/dmn_fixed_avtp25 --limit 40 \
+    --max-new-tokens 3072 --no-judge
+python scripts/rejudge_dmn.py --results runs/dmn_fixed_avtp25/results.jsonl \
+    --out runs/dmn_fixed_avtp25_binary --limit 40
+```
+
+SIVA 示例：
+
+```bash
+python scripts/run_stage1.py --attack siva --samples data/siva/attack_set_40_111_TYPO.jsonl \
+    --pruner avtp --budget 0.25 --out runs/siva_mmsb_fixed_avtp25 --limit 40 \
+    --max-new-tokens 3072 --no-judge
+python scripts/rejudge_siva_binary.py --results runs/siva_mmsb_fixed_avtp25/results.jsonl \
+    --out runs/siva_mmsb_fixed_avtp25_binary --limit 40
+```
+
 ## 必须补的格
 
 ### MIR-180（先建集，再跑 5 格）
