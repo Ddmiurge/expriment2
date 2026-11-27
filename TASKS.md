@@ -208,6 +208,21 @@ python scripts/build_mir_expanded.py --root ~/data/MIR-SafetyBench \
 ```
 
 
+## G · 回答可用性 U（2026-11-27）
+
+- `src/eval/usability.py`：U 0–5 判官（只看 instruction+response）；
+- `scripts/score_usability.py`：批量预标已有 `results.jsonl`，不重新生成；
+- 说明：`protocols/usability_scoring_2026-11-27.md`；
+- 先跑 SIVA-FR / MIR-180，再跑 MIDAS / DMN / SCJ。
+
+```bash
+python scripts/score_usability.py \
+    --input siva_fr_none=runs/siva_fr_none_binary/results.jsonl \
+    --input siva_fr_ri25=runs/siva_fr_rip25_binary/results.jsonl \
+    --out runs/usability_siva_fr --limit 75
+```
+
+
 # 历史：MIDAS 4096 重跑 + MIR none/AVTP（2026-11-18）
 
 > **本轮只跑 4 个格**：MIDAS `none`/`avtp` 4096；MIR `none`/`avtp` 4096。
