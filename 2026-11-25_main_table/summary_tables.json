@@ -1,0 +1,254 @@
+{
+  "MIDAS": {
+    "none": {
+      "dir": "stage1_base_3072",
+      "n": 40,
+      "ok": 24,
+      "asr": 0.6,
+      "trunc": 12,
+      "chars": 5626
+    },
+    "AVTP keep25%": {
+      "dir": "midas_fixed_avtp25",
+      "n": 40,
+      "ok": 19,
+      "asr": 0.475,
+      "trunc": 23,
+      "chars": 6648
+    },
+    "AVTP keep50%": {
+      "dir": "stage1_avtp50",
+      "n": 40,
+      "ok": 11,
+      "asr": 0.275,
+      "trunc": 17,
+      "chars": 5735
+    },
+    "RI keep25%": {
+      "dir": "riprune25_midas_40",
+      "n": 40,
+      "ok": 10,
+      "asr": 0.25,
+      "trunc": 28,
+      "chars": 9524
+    },
+    "RI keep50%": {
+      "dir": "midas_fixed_rip50",
+      "n": 40,
+      "ok": 11,
+      "asr": 0.275,
+      "trunc": 26,
+      "chars": 10702
+    }
+  },
+  "DMN": {
+    "none": {
+      "dir": "dmn_fixed_none_binary",
+      "n": 40,
+      "ok": 37,
+      "asr": 0.925,
+      "trunc": 0,
+      "chars": 3075
+    },
+    "AVTP keep25%": {
+      "dir": "dmn_fixed_avtp25_binary",
+      "n": 40,
+      "ok": 33,
+      "asr": 0.825,
+      "trunc": 3,
+      "chars": 3839
+    },
+    "AVTP keep50%": {
+      "dir": "dmn_fixed_avtp50_binary",
+      "n": 40,
+      "ok": 36,
+      "asr": 0.9,
+      "trunc": 1,
+      "chars": 3258
+    },
+    "RI keep25%": {
+      "dir": "dmn_fixed_rip25_binary",
+      "n": 40,
+      "ok": 35,
+      "asr": 0.875,
+      "trunc": 1,
+      "chars": 2821
+    },
+    "RI keep50%": {
+      "dir": "dmn_fixed_rip50_binary",
+      "n": 40,
+      "ok": 35,
+      "asr": 0.875,
+      "trunc": 2,
+      "chars": 2497
+    }
+  },
+  "SCJ": {
+    "none": {
+      "dir": "scj_fixed_none_a5",
+      "n": 40,
+      "ok": 32,
+      "asr": 0.8,
+      "trunc": 0,
+      "chars": 2386
+    },
+    "AVTP keep25%": {
+      "dir": "scj_fixed_avtp25_a5",
+      "n": 40,
+      "ok": 35,
+      "asr": 0.875,
+      "trunc": 0,
+      "chars": 2483
+    },
+    "AVTP keep50%": {
+      "dir": "scj_fixed_avtp50_a5",
+      "n": 40,
+      "ok": 34,
+      "asr": 0.85,
+      "trunc": 0,
+      "chars": 2592
+    },
+    "RI keep25%": {
+      "dir": "scj_fixed_rip25_a5",
+      "n": 40,
+      "ok": 36,
+      "asr": 0.9,
+      "trunc": 0,
+      "chars": 2471
+    },
+    "RI keep50%": {
+      "dir": "scj_fixed_rip50_a5",
+      "n": 40,
+      "ok": 35,
+      "asr": 0.875,
+      "trunc": 0,
+      "chars": 2541
+    }
+  },
+  "SIVA-MMSB": {
+    "none": {
+      "dir": "siva_fixed_none_binary",
+      "n": 40,
+      "ok": 12,
+      "asr": 0.3,
+      "trunc": 0,
+      "chars": 1684
+    },
+    "AVTP keep25%": {
+      "dir": "siva_mmsb_fixed_avtp25_binary",
+      "n": 40,
+      "ok": 12,
+      "asr": 0.3,
+      "trunc": 0,
+      "chars": 1803
+    },
+    "AVTP keep50%": {
+      "dir": "siva_fixed_avtp_binary",
+      "n": 40,
+      "ok": 14,
+      "asr": 0.35,
+      "trunc": 0,
+      "chars": 1978
+    },
+    "RI keep25%": {
+      "dir": "siva_mmsb_fixed_rip25_binary",
+      "n": 40,
+      "ok": 0,
+      "asr": 0.0,
+      "trunc": 4,
+      "chars": 1283
+    },
+    "RI keep50%": {
+      "dir": "siva_fixed_riprune_binary",
+      "n": 40,
+      "ok": 3,
+      "asr": 0.075,
+      "trunc": 1,
+      "chars": 1712
+    }
+  },
+  "SIVA-FR": {
+    "none": {
+      "dir": "siva_fr_none_binary",
+      "n": 75,
+      "ok": 24,
+      "asr": 0.32,
+      "trunc": 0,
+      "chars": 1412
+    },
+    "AVTP keep25%": {
+      "dir": "siva_fr_avtp25_binary",
+      "n": 75,
+      "ok": 15,
+      "asr": 0.2,
+      "trunc": 1,
+      "chars": 1598
+    },
+    "AVTP keep50%": {
+      "dir": "siva_fr_avtp_binary",
+      "n": 75,
+      "ok": 18,
+      "asr": 0.24,
+      "trunc": 1,
+      "chars": 1462
+    },
+    "RI keep25%": {
+      "dir": "siva_fr_rip25_binary",
+      "n": 75,
+      "ok": 11,
+      "asr": 0.1467,
+      "trunc": 0,
+      "chars": 1514
+    },
+    "RI keep50%": {
+      "dir": "siva_fr_riprune_binary",
+      "n": 75,
+      "ok": 12,
+      "asr": 0.16,
+      "trunc": 1,
+      "chars": 1468
+    }
+  },
+  "MIR-180": {
+    "none": {
+      "dir": "mir180_none",
+      "n": 180,
+      "ok": 97,
+      "asr": 0.5389,
+      "trunc": 17,
+      "chars": 2891
+    },
+    "AVTP keep25%": {
+      "dir": "mir180_avtp25",
+      "n": 180,
+      "ok": 94,
+      "asr": 0.5222,
+      "trunc": 21,
+      "chars": 3016
+    },
+    "AVTP keep50%": {
+      "dir": "mir180_avtp50",
+      "n": 180,
+      "ok": 93,
+      "asr": 0.5167,
+      "trunc": 18,
+      "chars": 2857
+    },
+    "RI keep25%": {
+      "dir": "mir180_rip25",
+      "n": 180,
+      "ok": 70,
+      "asr": 0.3889,
+      "trunc": 21,
+      "chars": 2458
+    },
+    "RI keep50%": {
+      "dir": "mir180_rip50",
+      "n": 180,
+      "ok": 88,
+      "asr": 0.4889,
+      "trunc": 24,
+      "chars": 2894
+    }
+  }
+}
