@@ -60,6 +60,46 @@ summary.json      每个 label 的 n / mean / median / U>=3 比例
 review.csv        人工复核表（含 240 字 preview）
 ```
 
+## MIDAS / DMN / SCJ 完整命令
+
+### MIDAS
+
+```bash
+python scripts/score_usability.py \
+    --input midas_none=runs/stage1_base_3072/results.jsonl \
+    --input midas_avtp25=runs/midas_fixed_avtp25/results.jsonl \
+    --input midas_avtp50=runs/stage1_avtp50/results.jsonl \
+    --input midas_ri25=runs/riprune25_midas_40/results.jsonl \
+    --input midas_ri50=runs/midas_fixed_rip50/results.jsonl \
+    --out runs/usability_midas --limit 40
+```
+
+### DMN
+
+```bash
+python scripts/score_usability.py \
+    --input dmn_none=runs/dmn_fixed_none_binary/results.jsonl \
+    --input dmn_avtp25=runs/dmn_fixed_avtp25_binary/results.jsonl \
+    --input dmn_avtp50=runs/dmn_fixed_avtp50_binary/results.jsonl \
+    --input dmn_ri25=runs/dmn_fixed_rip25_binary/results.jsonl \
+    --input dmn_ri50=runs/dmn_fixed_rip50_binary/results.jsonl \
+    --out runs/usability_dmn --limit 40
+```
+
+### SCJ
+
+```bash
+python scripts/score_usability.py \
+    --input scj_none=runs/scj_fixed_none_a5/results.jsonl \
+    --input scj_avtp25=runs/scj_fixed_avtp25_a5/results.jsonl \
+    --input scj_avtp50=runs/scj_fixed_avtp50_a5/results.jsonl \
+    --input scj_ri25=runs/scj_fixed_rip25_a5/results.jsonl \
+    --input scj_ri50=runs/scj_fixed_rip50_a5/results.jsonl \
+    --out runs/usability_scj --limit 40
+```
+
+> SCJ 这里评的是 pass@5 选出的最终回答（`results.jsonl` 的 `response`），不是 5 次逐次回答。
+
 ## 读法
 
 - 先看 `summary.json` 的 mean/median/U≥3；
